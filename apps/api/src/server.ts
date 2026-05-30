@@ -22,14 +22,8 @@ Sentry.init({
     profilesSampleRate: 1.0,
 });
 
-// Initailize Fastify with Pino Logger 
 const app = Fastify({
-    logger: {
-        transport: {
-            target: 'pino-pretty',
-            options: { translateTime: 'HH:MM:ss Z', ignore: 'pid,hostname' },
-        },
-    },
+    logger: true,
 });
 
 // Register Plugins 
