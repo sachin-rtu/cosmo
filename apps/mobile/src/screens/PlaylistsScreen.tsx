@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { usePlaylistStore } from '../store/playlistStore'
 import { useAuthStore } from '../store/authStore'
+import EmptyState from '../components/EmptyState'
 
 export default function PlaylistsScreen() {
     const navigation = useNavigation<NativeStackNavigationProp<any>>()
@@ -54,10 +55,11 @@ export default function PlaylistsScreen() {
                     <Text style={styles.headerTitle}>Your Playlists</Text>
                     <View style={{ width: 40 }} />
                 </View>
-                <View style={styles.emptyContainer}>
-                    <Text style={styles.emptyTitle}>Log in required</Text>
-                    <Text style={styles.emptySubtitle}>You must be logged in to create and save playlists.</Text>
-                </View>
+                <EmptyState
+                    icon="🔒"
+                    title="Log in required"
+                    message="You must be logged in to create and save playlists."
+                />
             </SafeAreaView>
         )
     }
@@ -84,10 +86,12 @@ export default function PlaylistsScreen() {
                 onRefresh={fetchPlaylists}
                 ListEmptyComponent={
                     !loading ? (
-                        <View style={styles.emptyContainer}>
-                            <Text style={styles.emptyTitle}>No Playlists Yet</Text>
-                            <Text style={styles.emptySubtitle}>Tap the + button to create your first playlist.</Text>
-                        </View>
+                        <EmptyState
+                            icon="🎵"
+                            title="No playlists yet"
+                            message="Tap the button below to create your first playlist."
+                            action={{ label: 'Create Playlist', onPress: handleCreatePlaylist }}
+                        />
                     ) : null
                 }
                 renderItem={({ item }) => (
@@ -192,20 +196,5 @@ const styles = StyleSheet.create({
     chevron: {
         color: '#444',
         fontSize: 24,
-    },
-    emptyContainer: {
-        marginTop: 100,
-        alignItems: 'center',
-    },
-    emptyTitle: {
-        color: '#fff',
-        fontSize: 20,
-        fontWeight: '700',
-        marginBottom: 8,
-    },
-    emptySubtitle: {
-        color: '#888',
-        fontSize: 14,
-        textAlign: 'center',
     },
 })

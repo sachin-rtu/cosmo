@@ -18,6 +18,9 @@ import * as FileSystem from 'expo-file-system'
 import { useAuthStore } from '../store/authStore'
 import { useOnboardingStore } from '../store/onboardingStore'
 import { supabase } from '../services/supabase'
+import { TrackCardSkeleton } from '../components/Skeleton'
+import EmptyState from '../components/EmptyState'
+
 
 interface TrendingTrack {
   videoId: string
@@ -43,6 +46,7 @@ export default function HomeScreen() {
   const [results, setResults] = useState<CosmoTrack[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState('')
+  const [hasSearched, setHasSearched] = useState(false)
   const [menuTrack, setMenuTrack] = useState<CosmoTrack | null>(null)
   
   const [recording, setRecording] = useState<Audio.Recording | undefined>()
@@ -144,6 +148,7 @@ export default function HomeScreen() {
     if (!query.trim()) return
     setLoading(true)
     setError('')
+    setHasSearched(true)
     try {
       const response = await api.get('/stream/search', { params: { q: query } })
       const tracks: CosmoTrack[] = response.data.map((t: any) => ({
@@ -156,6 +161,7 @@ export default function HomeScreen() {
         url:        '',
       }))
       setResults(tracks)
+      setHasSearched(true)
     } catch (err: any) {
       console.error(err)
       setError('Search failed. Please try again.')
@@ -334,11 +340,7 @@ export default function HomeScreen() {
           {trendingLoading ? (
             <View style={styles.trendingSkeletonRow}>
               {[0, 1, 2, 3].map(i => (
-                <View key={i} style={styles.trendingSkeletonCard}>
-                  <View style={styles.trendingSkeletonThumb} />
-                  <View style={styles.trendingSkeletonLine} />
-                  <View style={[styles.trendingSkeletonLine, { width: '60%' }]} />
-                </View>
+                <TrackCardSkeleton key={i} cardWidth={130} />
               ))}
             </View>
           ) : (
@@ -393,11 +395,7 @@ export default function HomeScreen() {
           {forYouLoading ? (
             <View style={styles.forYouSkeletonRow}>
               {[0, 1, 2, 3].map(i => (
-                <View key={i} style={styles.forYouSkeletonCard}>
-                  <View style={styles.forYouSkeletonThumb} />
-                  <View style={styles.forYouSkeletonLine} />
-                  <View style={[styles.forYouSkeletonLine, { width: '60%' }]} />
-                </View>
+                <TrackCardSkeleton key={i} cardWidth={130} />
               ))}
             </View>
           ) : forYouTracks.length > 0 ? (
@@ -540,6 +538,15 @@ export default function HomeScreen() {
         </View>
       )}
 
+      {/* Search empty state */}
+      {hasSearched && results.length === 0 && !loading && (
+        <EmptyState
+          icon="🔍"
+          title="No results found"
+          message="Try searching for a different track or artist."
+        />
+      )}
+
       {/* Results */}
       <FlatList
         data={results}
@@ -595,6 +602,15 @@ export default function HomeScreen() {
             </TouchableOpacity>
           )
         }}
+        ListEmptyComponent={
+          hasSearched && !loading ? (
+            <EmptyState
+              icon="🔍"
+              title="No results found"
+              message="Try searching for a different track or artist."
+            />
+          ) : null
+        }
       />
 
       {/* ── Bottom Sheet Modal ─────────────────────────────────────────────── */}
@@ -1164,32 +1180,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     marginTop: 2,
   },
-  // Skeleton placeholders
+  // Skeleton row container (animated skeletons live in Skeleton.tsx)
   trendingSkeletonRow: {
     flexDirection: 'row',
     gap: 12,
-  },
-  trendingSkeletonCard: {
-    width: 130,
-    borderRadius: 12,
-    backgroundColor: '#141414',
-    overflow: 'hidden',
-    paddingBottom: 10,
-  },
-  trendingSkeletonThumb: {
-    width: 130,
-    height: 130,
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  trendingSkeletonLine: {
-    height: 10,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 4,
-    marginTop: 8,
-    marginHorizontal: 8,
-    width: '80%',
   },
   // ── For You (AI Recommendations) ──────────────────────────────────────────
   forYouSection: {
@@ -1254,28 +1248,6 @@ const styles = StyleSheet.create({
   forYouSkeletonRow: {
     flexDirection: 'row',
     gap: 12,
-  },
-  forYouSkeletonCard: {
-    width: 130,
-    borderRadius: 12,
-    backgroundColor: '#141414',
-    overflow: 'hidden',
-    paddingBottom: 10,
-  },
-  forYouSkeletonThumb: {
-    width: 130,
-    height: 130,
-    backgroundColor: '#1a1a1a',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-  },
-  forYouSkeletonLine: {
-    height: 10,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 4,
-    marginTop: 8,
-    marginHorizontal: 8,
-    width: '80%',
   },
   // ── Liked Songs ───────────────────────────────────────────────────────────
   likedSection: {
