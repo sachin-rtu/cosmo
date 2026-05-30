@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: cosmo-api
+    env: node
+    plan: free
+    region: ohio # us-east
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false

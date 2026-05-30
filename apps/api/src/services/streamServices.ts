@@ -84,11 +84,11 @@ export async function searchTracks(query: string) {
 
     return results.videos
         .slice(0, 10)
-        .map(video => ({
+        .map((video: any) => ({
             videoId: video.id,
             title: video.title.text ?? 'Unknown',
             artist: video.author?.name ?? 'Unknown',
             durationMs: (video.duration?.seconds ?? 0) * 1000,
-            thumbnail: video.thumbnail?.[0]?.url ?? null,
+            thumbnail: video.thumbnails?.[0]?.url ?? null,
         }))
 }

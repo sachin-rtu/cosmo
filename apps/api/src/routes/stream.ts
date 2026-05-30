@@ -1,8 +1,19 @@
 import type { FastifyInstance } from 'fastify'
 import { getOrSet, invalidate } from '../plugins/cacheHelpers'
-import { getStreamUrl } from '../services/streamServices'
+import { getStreamUrl, searchTracks } from '../services/streamServices'
 
 export async function streamRoutes(fastify: FastifyInstance) {
+
+    fastify.get('/search', async (request, reply) => {
+        const { q } = request.query as { q: string }
+
+        if (!q?.trim()) {
+            return reply.status(400).send({ error: 'Query is required' })
+        }
+
+        const results = await searchTracks(q)
+        return reply.send(results)
+    })
 
     fastify.get('/:videoId', async (request, reply) => {
 

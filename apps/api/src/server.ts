@@ -6,6 +6,10 @@ import cors from '@fastify/cors';
 import authRoutes from './routes/auth';
 import cachePlugin from './plugins/cache';
 import { streamRoutes } from './routes/stream';
+import { trendingRoutes } from './routes/trending';
+import { recommendationRoutes } from './routes/recommendations';
+import { likesRoutes } from './routes/likes';
+import { playlistsRoutes } from './routes/playlists';
 import queuePlugin from './plugins/queue'
 import contextRoutes from './routes/context'
 import { startContextWorker } from './workers/contextWorker'
@@ -42,13 +46,18 @@ app.get('/health', async (request, reply) => {
 app.register(authRoutes);
 
 app.register(streamRoutes, { prefix: '/stream' });
+app.register(trendingRoutes, { prefix: '/trending' });
+app.register(recommendationRoutes, { prefix: '/ai' });
+app.register(likesRoutes, { prefix: '/likes' });
+app.register(playlistsRoutes, { prefix: '/playlists' });
 
 app.register(contextRoutes, { prefix: '/context' });
 
 // Start server function 
 const start = async () => {
     try {
-        await app.listen({ port: 8080, host: '0.0.0.0' });
+        const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 8080;
+        await app.listen({ port, host: '0.0.0.0' });
         app.log.info(`Cosmo API is running!`);
 
         try {
