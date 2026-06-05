@@ -18,7 +18,7 @@
     "bullmq": "^5.7.8",
     "dotenv": "^16.4.5",
     "fastify": "^4.27.0",
-    "youtubei.js": "^9.3.0"
+    "youtubei.js": "^17.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",
