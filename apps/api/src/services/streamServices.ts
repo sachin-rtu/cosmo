@@ -1,5 +1,5 @@
 import { Innertube, Platform } from 'youtubei.js'
-import ytdl from '@distube/ytdl-core'
+import youtubedl from 'youtube-dl-exec'
 
 
 // signature-protected stream URLs. Without this, the library cannot
@@ -25,17 +25,26 @@ async function getInnertube(): Promise<Innertube> {
 
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
     try {
-        const info = await ytdl.getInfo(videoId)
+        const info = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+            dumpSingleJson: true,
+            noCheckCertificates: true,
+            noWarnings: true,
+            preferFreeFormats: true,
+            addHeader: [
+                'referer:youtube.com',
+                'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+            ]
+        }) as any;
         
-        if (info.videoDetails.isLiveContent) {
-            const manifestUrl = info.formats.find(f => f.isHLS)?.url
+        if (info.is_live) {
+            const manifestUrl = info.formats.find((f: any) => f.format_id === '91' || f.format_id === '92' || f.format_id === '93' || f.format_id === '94' || f.format_id === '95' || f.format_id === '96' || f.url?.includes('m3u8'))?.url || info.url;
             if (!manifestUrl) {
                 throw new Error(`No HLS manifest found for live stream: ${videoId}`)
             }
             return { type: 'live', url: manifestUrl, expiresAt: null }
         }
 
-        const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' })
+        const format = info.formats.find((f: any) => f.acodec !== 'none' && f.vcodec === 'none') || info.formats.find((f: any) => f.acodec !== 'none');
         
         if (!format || !format.url) {
             throw new Error(`No audio format found for video: ${videoId}`)
@@ -50,7 +59,7 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error)
-        console.error('Error getting stream URL with ytdl-core:', errorMessage)
+        console.error('Error getting stream URL with youtube-dl-exec:', errorMessage)
         throw new Error(`Failed to get stream url: ${errorMessage}`)
     }
 }

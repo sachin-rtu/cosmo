@@ -9,7 +9,6 @@
     "build": "tsc"
   },
   "dependencies": {
-    "@distube/ytdl-core": "^4.16.12",
     "@fastify/cors": "^9.0.1",
     "@google/generative-ai": "^0.24.1",
     "@sentry/node": "^8.2.1",
@@ -19,6 +18,8 @@
     "bullmq": "^5.7.8",
     "dotenv": "^16.4.5",
     "fastify": "^4.27.0",
+    "play-dl": "^1.9.7",
+    "youtube-dl-exec": "^3.1.7",
     "youtubei.js": "^17.0.1"
   },
   "devDependencies": {
