@@ -5,7 +5,7 @@ import { getTrendingTracks } from '../services/trendingService'
 export async function trendingRoutes(fastify: FastifyInstance) {
 
     fastify.get('/', async (_request, reply) => {
-        const cacheKey = 'trending:IN'
+        const cacheKey = 'trending:IN:v2'
 
         const tracks = await getOrSet(
             fastify,
