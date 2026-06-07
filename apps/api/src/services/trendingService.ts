@@ -61,8 +61,8 @@ function extractTracksFromShelf(contents: any[]): TrendingTrack[] {
 
     for (const item of contents) {
         if (item instanceof YTNodes.MusicTwoRowItem) {
-            const videoId = item.id
-            if (!videoId) continue
+            const videoId = item.endpoint?.payload?.videoId || (item.id?.length === 11 ? item.id : null)
+            if (!videoId || videoId.length !== 11) continue
 
             tracks.push({
                 videoId,
@@ -73,8 +73,8 @@ function extractTracksFromShelf(contents: any[]): TrendingTrack[] {
             })
         } else if (item instanceof YTNodes.MusicResponsiveListItem) {
             if (item.item_type !== 'song' && item.item_type !== 'video') continue
-            const videoId = item.id
-            if (!videoId) continue
+            const videoId = item.endpoint?.payload?.videoId || (item.id?.length === 11 ? item.id : null)
+            if (!videoId || videoId.length !== 11) continue
 
             tracks.push({
                 videoId,
@@ -101,8 +101,8 @@ async function searchFallback(yt: Innertube): Promise<TrendingTrack[]> {
             if (!('contents' in section)) continue
             for (const item of (section as any).contents) {
                 if (item instanceof YTNodes.MusicResponsiveListItem) {
-                    const videoId = item.id
-                    if (!videoId) continue
+                    const videoId = item.endpoint?.payload?.videoId || (item.id?.length === 11 ? item.id : null)
+                    if (!videoId || videoId.length !== 11) continue
 
                     tracks.push({
                         videoId,
