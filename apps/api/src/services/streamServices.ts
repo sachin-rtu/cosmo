@@ -49,8 +49,9 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
             expiresAt,
         }
     } catch (error) {
-        console.error('Error getting stream URL with ytdl-core:', error.message)
-        throw new Error(`Failed to get stream url: ${error.message}`)
+        const errorMessage = error instanceof Error ? error.message : String(error)
+        console.error('Error getting stream URL with ytdl-core:', errorMessage)
+        throw new Error(`Failed to get stream url: ${errorMessage}`)
     }
 }
 
