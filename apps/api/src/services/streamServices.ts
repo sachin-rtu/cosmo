@@ -1,6 +1,7 @@
 import { Innertube, Platform } from 'youtubei.js'
+import ytdl from '@distube/ytdl-core'
 
-// Provide a custom JavaScript evaluator for deciphering YouTube's
+
 // signature-protected stream URLs. Without this, the library cannot
 // resolve URLs that use signature ciphers.
 Platform.shim.eval = async (data: any) => {
@@ -23,58 +24,33 @@ async function getInnertube(): Promise<Innertube> {
 }
 
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
-    const yt = await getInnertube()
-    const info = await yt.getInfo(videoId)
-
-    // Live streams 
-    if (info.basic_info.is_live) {
-        const manifestUrl = info.streaming_data?.hls_manifest_url
-        if (!manifestUrl) {
-            throw new Error(`No HLS manifest found for live stream: ${videoId}`)
-        }
-
-        return { type: 'live', url: manifestUrl, expiresAt: null }
-    }
-
-    // Try adaptive audio-only formats first, then fall back to muxed
-    let streamUrl: string | undefined
-
-    // 1. Try adaptive audio format (best quality audio-only)
-    const audioFormat = info.streaming_data?.adaptive_formats
-        ?.filter(f => f.has_audio && !f.has_video)
-        .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0]
-
-    if (audioFormat) {
-        streamUrl = audioFormat.url
-        if (!streamUrl && (audioFormat.signature_cipher || audioFormat.cipher)) {
-            streamUrl = await audioFormat.decipher(yt.session.player)
-        }
-    }
-
-    // 2. Fall back to muxed format (audio+video, but has cipher data)
-    if (!streamUrl) {
-        const muxedFormat = info.streaming_data?.formats
-            ?.filter(f => f.has_audio)
-            .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0]
-
-        if (muxedFormat) {
-            streamUrl = muxedFormat.url
-            if (!streamUrl && (muxedFormat.signature_cipher || muxedFormat.cipher)) {
-                streamUrl = await muxedFormat.decipher(yt.session.player)
+    try {
+        const info = await ytdl.getInfo(videoId)
+        
+        if (info.videoDetails.isLiveContent) {
+            const manifestUrl = info.formats.find(f => f.isHLS)?.url
+            if (!manifestUrl) {
+                throw new Error(`No HLS manifest found for live stream: ${videoId}`)
             }
+            return { type: 'live', url: manifestUrl, expiresAt: null }
         }
-    }
 
-    if (!streamUrl) {
-        throw new Error(`No audio format found for video: ${videoId}`)
-    }
+        const format = ytdl.chooseFormat(info.formats, { quality: 'highestaudio', filter: 'audioonly' })
+        
+        if (!format || !format.url) {
+            throw new Error(`No audio format found for video: ${videoId}`)
+        }
 
-    const expiresAt = Math.floor(Date.now() / 1000) + (4 * 60 * 60)
+        const expiresAt = Math.floor(Date.now() / 1000) + (4 * 60 * 60)
 
-    return {
-        type: 'vod',
-        url: streamUrl,
-        expiresAt,
+        return {
+            type: 'vod',
+            url: format.url,
+            expiresAt,
+        }
+    } catch (error) {
+        console.error('Error getting stream URL with ytdl-core:', error.message)
+        throw new Error(`Failed to get stream url: ${error.message}`)
     }
 }
 
