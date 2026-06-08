@@ -1,6 +1,7 @@
 import { Innertube, Platform } from 'youtubei.js'
 import youtubedl, { create as createYtdl } from 'youtube-dl-exec'
 import { execSync } from 'child_process'
+import playdl from 'play-dl'
 
 
 // signature-protected stream URLs. Without this, the library cannot
@@ -68,7 +69,7 @@ function parseYtDlpResult(info: any, videoId: string): streamResult {
     }
 }
 
-// Primary: use yt-dlp via youtube-dl-exec
+// Strategy 1: use yt-dlp via youtube-dl-exec (needs python3)
 async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
     const url = `https://www.youtube.com/watch?v=${videoId}`
 
@@ -88,56 +89,56 @@ async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
     }
 }
 
-// Fallback: use youtubei.js (Innertube) directly
-async function getStreamUrlWithInnertube(videoId: string): Promise<streamResult> {
-    const yt = await getInnertube()
-    const info = await yt.getBasicInfo(videoId)
+// Strategy 2: use play-dl (pure JavaScript, no external binaries needed)
+async function getStreamUrlWithPlayDl(videoId: string): Promise<streamResult> {
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+    const info = await playdl.video_info(url)
 
-    if (info.basic_info.is_live) {
-        const hlsUrl = info.streaming_data?.hls_manifest_url
+    if (info.LiveStreamData?.isLive) {
+        const hlsUrl = info.LiveStreamData.hlsManifestUrl
         if (!hlsUrl) {
-            throw new Error(`No HLS manifest found for live stream (innertube): ${videoId}`)
+            throw new Error(`No HLS manifest found for live stream (play-dl): ${videoId}`)
         }
         return { type: 'live', url: hlsUrl, expiresAt: null }
     }
 
-    // Prefer audio-only adaptive formats
-    const adaptiveFormats = info.streaming_data?.adaptive_formats ?? []
-    const audioFormat = adaptiveFormats.find(
-        (f: any) => f.mime_type?.startsWith('audio/') && f.url
-    )
+    // Get audio-only formats, sorted by bitrate (highest first)
+    const formats = info.format
+        .filter((f: any) => f.mimeType?.startsWith('audio/') && f.url)
+        .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))
 
-    if (audioFormat?.url) {
+    if (formats.length > 0) {
         const expiresAt = Math.floor(Date.now() / 1000) + (4 * 60 * 60)
-        return { type: 'vod', url: audioFormat.url, expiresAt }
+        return { type: 'vod', url: formats[0].url!, expiresAt }
     }
 
     // Fall back to any format with a URL
-    const anyFormat = info.streaming_data?.formats?.find((f: any) => f.url)
+    const anyFormat = info.format.find((f: any) => f.url)
     if (anyFormat?.url) {
         const expiresAt = Math.floor(Date.now() / 1000) + (4 * 60 * 60)
         return { type: 'vod', url: anyFormat.url, expiresAt }
     }
 
-    throw new Error(`No playable format found (innertube): ${videoId}`)
+    throw new Error(`No playable format found (play-dl): ${videoId}`)
 }
 
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
-    // Try yt-dlp first, fall back to youtubei.js
+    // Try yt-dlp first (best quality, but needs python3)
+    // Then play-dl (pure JS, works everywhere)
     try {
         return await getStreamUrlWithYtDlp(videoId)
     } catch (ytdlError) {
         const ytdlMsg = ytdlError instanceof Error ? ytdlError.message : String(ytdlError)
-        console.warn('yt-dlp failed, trying innertube fallback:', ytdlMsg)
+        console.warn('yt-dlp failed, trying play-dl fallback:', ytdlMsg)
 
         try {
-            return await getStreamUrlWithInnertube(videoId)
-        } catch (innertubeError) {
-            const innertubeMsg = innertubeError instanceof Error ? innertubeError.message : String(innertubeError)
-            console.error('Both yt-dlp and innertube failed for', videoId)
+            return await getStreamUrlWithPlayDl(videoId)
+        } catch (playDlError) {
+            const playDlMsg = playDlError instanceof Error ? playDlError.message : String(playDlError)
+            console.error('Both yt-dlp and play-dl failed for', videoId)
             console.error('  yt-dlp error:', ytdlMsg)
-            console.error('  innertube error:', innertubeMsg)
-            throw new Error(`Failed to get stream url: ${ytdlMsg} | innertube: ${innertubeMsg}`)
+            console.error('  play-dl error:', playDlMsg)
+            throw new Error(`Failed to get stream url: ${ytdlMsg} | play-dl: ${playDlMsg}`)
         }
     }
 }
