@@ -21,6 +21,7 @@ async function getInnertube(): Promise<Innertube> {
     if (!innertube) {
         innertube = await Innertube.create({
             retrieve_player: true,
+            generate_session_locally: true
         })
     }
     return innertube
@@ -91,13 +92,34 @@ async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
     return parseYtDlpResult(info, videoId)
 }
 
+async function getStreamUrlWithYti(videoId: string): Promise<streamResult> {
+    const yt = await getInnertube()
+    const info = await yt.getInfo(videoId)
+    const format = info.chooseFormat({ type: 'audio', quality: 'best' })
+    if (!format || !format.url) {
+        throw new Error(`No audio format found for video: ${videoId}`)
+    }
+    return {
+        type: 'vod',
+        url: format.url,
+        expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60)
+    }
+}
+
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
     try {
         return await getStreamUrlWithYtDlp(videoId)
     } catch (ytdlError) {
         const ytdlMsg = ytdlError instanceof Error ? ytdlError.message : String(ytdlError)
         console.error('yt-dlp failed for', videoId, ytdlMsg)
-        throw new Error(`Failed to get stream url: ${ytdlMsg}`)
+        
+        console.log('Falling back to youtubei.js for', videoId)
+        try {
+            return await getStreamUrlWithYti(videoId)
+        } catch (ytiError) {
+            console.error('youtubei.js failed for', videoId, ytiError)
+            throw new Error(`Failed to get stream url: yt-dlp error: ${ytdlMsg}, youtubei error: ${ytiError instanceof Error ? ytiError.message : String(ytiError)}`)
+        }
     }
 }
 
