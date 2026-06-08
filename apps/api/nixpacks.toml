@@ -1,2 +1,5 @@
 [phases.setup]
-nixPkgs = ["...", "python3", "yt-dlp"]
+nixPkgs = ["...", "python3", "python3Packages.pip", "yt-dlp"]
+
+[phases.install]
+cmds = ["pip install --upgrade yt-dlp", "npm ci"]
