@@ -6,6 +6,7 @@ import {
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable'
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist'
 import { usePlayerStore, type CosmoTrack } from '../store/playerStore'
 import type { RootStackParams } from '../navigation'
 
@@ -41,19 +42,66 @@ export default function QueueScreen() {
         setTimeout(() => removeFromQueue(queueIndex), 150) // let animation finish
     }, [removeFromQueue])
 
-    const handleMoveUp = useCallback((upcomingIdx: number) => {
+    const renderItem = ({ item: track, getIndex, drag, isActive }: RenderItemParams<CosmoTrack>) => {
+        const upcomingIdx = getIndex() ?? 0
         const queueIdx = currentIndex + 1 + upcomingIdx
-        if (queueIdx > currentIndex + 1) {
-            reorderQueue(queueIdx, queueIdx - 1)
-        }
-    }, [currentIndex, reorderQueue])
 
-    const handleMoveDown = useCallback((upcomingIdx: number) => {
-        const queueIdx = currentIndex + 1 + upcomingIdx
-        if (queueIdx < queue.length - 1) {
-            reorderQueue(queueIdx, queueIdx + 1)
-        }
-    }, [currentIndex, queue.length, reorderQueue])
+        return (
+            <ScaleDecorator>
+                <ReanimatedSwipeable
+                    key={track.videoId + queueIdx}
+                    ref={((ref: SwipeableMethods | null) => {
+                        if (ref) swipeableRefs.current.set(queueIdx, ref)
+                    }) as any}
+                    renderRightActions={() => <RightAction />}
+                    onSwipeableOpen={() => handleRemove(queueIdx)}
+                    overshootRight={false}
+                    friction={2}
+                    rightThreshold={80}
+                >
+                    <View style={[styles.trackRow, { backgroundColor: isActive ? '#1a1a1a' : '#0a0a0a' }]}>
+                        {/* Index */}
+                        <Text style={styles.trackIndex}>{upcomingIdx + 1}</Text>
+
+                        {/* Artwork */}
+                        {track.artwork ? (
+                            <Image
+                                source={{ uri: track.artwork }}
+                                style={styles.trackArtwork}
+                            />
+                        ) : (
+                            <View style={[styles.trackArtwork, styles.placeholderArt]} />
+                        )}
+
+                        {/* Info — tappable to play */}
+                        <TouchableOpacity
+                            style={styles.trackInfo}
+                            onPress={() => handlePlayTrack(track, queueIdx)}
+                            activeOpacity={0.7}
+                            disabled={isActive}
+                        >
+                            <Text style={styles.trackTitle} numberOfLines={1}>
+                                {track.title}
+                            </Text>
+                            <Text style={styles.trackArtist} numberOfLines={1}>
+                                {track.artist}
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Drag Handle */}
+                        <TouchableOpacity
+                            onLongPress={drag}
+                            disabled={isActive}
+                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                            style={styles.dragHandleBtn}
+                        >
+                            <Text style={styles.dragHandleIcon}>≡</Text>
+                        </TouchableOpacity>
+                    </View>
+                </ReanimatedSwipeable>
+            </ScaleDecorator>
+        )
+    }
 
     return (
         <SafeAreaView style={styles.container}>
@@ -68,7 +116,7 @@ export default function QueueScreen() {
                 >
                     <Text style={styles.backArrow}>←</Text>
                 </TouchableOpacity>
-                <Text style={styles.headerTitle}>Up Next</Text>
+                <Text style={styles.headerTitle}>Queue</Text>
                 <Text style={styles.trackCount}>
                     {upcomingTracks.length} track{upcomingTracks.length !== 1 ? 's' : ''}
                 </Text>
@@ -115,79 +163,16 @@ export default function QueueScreen() {
                         </Text>
                     </View>
                 ) : (
-                    <ScrollView
+                    <DraggableFlatList
+                        data={upcomingTracks}
+                        onDragEnd={({ from, to }) => {
+                            reorderQueue(currentIndex + 1 + from, currentIndex + 1 + to)
+                        }}
+                        keyExtractor={(item, index) => item.videoId + '-' + index}
+                        renderItem={renderItem}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={{ paddingBottom: 40 }}
-                    >
-                        {upcomingTracks.map((track, upcomingIdx) => {
-                            const queueIdx = currentIndex + 1 + upcomingIdx
-                            const isFirst = upcomingIdx === 0
-                            const isLast = upcomingIdx === upcomingTracks.length - 1
-
-                            return (
-                                <ReanimatedSwipeable
-                                    key={track.videoId + queueIdx}
-                                    ref={((ref: SwipeableMethods | null) => {
-                                        if (ref) swipeableRefs.current.set(queueIdx, ref)
-                                    }) as any}
-                                    renderRightActions={() => <RightAction />}
-                                    onSwipeableOpen={() => handleRemove(queueIdx)}
-                                    overshootRight={false}
-                                    friction={2}
-                                    rightThreshold={80}
-                                >
-                                    <View style={styles.trackRow}>
-                                        {/* Index */}
-                                        <Text style={styles.trackIndex}>{upcomingIdx + 1}</Text>
-
-                                        {/* Artwork */}
-                                        {track.artwork ? (
-                                            <Image
-                                                source={{ uri: track.artwork }}
-                                                style={styles.trackArtwork}
-                                            />
-                                        ) : (
-                                            <View style={[styles.trackArtwork, styles.placeholderArt]} />
-                                        )}
-
-                                        {/* Info — tappable to play */}
-                                        <TouchableOpacity
-                                            style={styles.trackInfo}
-                                            onPress={() => handlePlayTrack(track, queueIdx)}
-                                            activeOpacity={0.7}
-                                        >
-                                            <Text style={styles.trackTitle} numberOfLines={1}>
-                                                {track.title}
-                                            </Text>
-                                            <Text style={styles.trackArtist} numberOfLines={1}>
-                                                {track.artist}
-                                            </Text>
-                                        </TouchableOpacity>
-
-                                        {/* Reorder ↑↓ */}
-                                        <View style={styles.reorderBtns}>
-                                            <TouchableOpacity
-                                                onPress={() => handleMoveUp(upcomingIdx)}
-                                                disabled={isFirst}
-                                                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
-                                                style={[styles.reorderBtn, isFirst && styles.reorderBtnDisabled]}
-                                            >
-                                                <Text style={[styles.reorderIcon, isFirst && styles.reorderIconDisabled]}>↑</Text>
-                                            </TouchableOpacity>
-                                            <TouchableOpacity
-                                                onPress={() => handleMoveDown(upcomingIdx)}
-                                                disabled={isLast}
-                                                hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
-                                                style={[styles.reorderBtn, isLast && styles.reorderBtnDisabled]}
-                                            >
-                                                <Text style={[styles.reorderIcon, isLast && styles.reorderIconDisabled]}>↓</Text>
-                                            </TouchableOpacity>
-                                        </View>
-                                    </View>
-                                </ReanimatedSwipeable>
-                            )
-                        })}
-                    </ScrollView>
+                    />
                 )}
             </View>
         </SafeAreaView>
@@ -326,27 +311,16 @@ const styles = StyleSheet.create({
         fontSize: 12,
     },
 
-    // ── Reorder buttons ───────────────────────────────────────────────────────
-    reorderBtns: {
-        flexDirection: 'column',
-        gap: 2,
-    },
-    reorderBtn: {
-        width: 28,
-        height: 22,
+    // ── Drag Handle ───────────────────────────────────────────────────────────
+    dragHandleBtn: {
+        padding: 8,
         justifyContent: 'center',
         alignItems: 'center',
     },
-    reorderBtnDisabled: {
-        opacity: 0.2,
-    },
-    reorderIcon: {
-        color: '#888',
-        fontSize: 16,
+    dragHandleIcon: {
+        color: '#555',
+        fontSize: 24,
         fontWeight: '700',
-    },
-    reorderIconDisabled: {
-        color: '#333',
     },
 
     // ── Swipe to delete ───────────────────────────────────────────────────────
