@@ -48,12 +48,13 @@ const ytdlOptions = {
     noCheckCertificates: true,
     noWarnings: true,
     preferFreeFormats: true,
+    'extractor-args': 'youtube:player_client=default,ios',
     addHeader: [
         'referer:youtube.com',
         'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
     ]
 } as const;
-const ytdlOpts = { ...ytdlOptions, addHeader: [...ytdlOptions.addHeader] }
+const ytdlOpts = { ...ytdlOptions, addHeader: [...ytdlOptions.addHeader] } as any
 
 function parseYtDlpResult(info: any, videoId: string): streamResult {
     if (info.is_live) {

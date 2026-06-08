@@ -127,9 +127,9 @@ export default function QueueScreen() {
                             return (
                                 <ReanimatedSwipeable
                                     key={track.videoId + queueIdx}
-                                    ref={(ref: SwipeableMethods | null) => {
+                                    ref={((ref: SwipeableMethods | null) => {
                                         if (ref) swipeableRefs.current.set(queueIdx, ref)
-                                    }}
+                                    }) as any}
                                     renderRightActions={() => <RightAction />}
                                     onSwipeableOpen={() => handleRemove(queueIdx)}
                                     overshootRight={false}
