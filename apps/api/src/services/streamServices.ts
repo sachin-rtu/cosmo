@@ -1,7 +1,8 @@
 import { Innertube, Platform } from 'youtubei.js'
 import youtubedl, { create as createYtdl } from 'youtube-dl-exec'
 import { execSync } from 'child_process'
-import playdl from 'play-dl'
+import path from 'path'
+import fs from 'fs'
 
 
 // signature-protected stream URLs. Without this, the library cannot
@@ -25,12 +26,21 @@ async function getInnertube(): Promise<Innertube> {
     return innertube
 }
 
-// Resolve the system yt-dlp binary path (from nix or pip install)
-let systemYtDlpPath: string | null = null
+// Resolve the yt-dlp binary path (standalone linux binary or system)
+let customYtDlpPath: string | null = null
 try {
-    systemYtDlpPath = execSync('which yt-dlp', { encoding: 'utf-8' }).trim()
+    const localPath = path.join(__dirname, '..', '..', 'yt-dlp_linux')
+    const localPath2 = path.join(process.cwd(), 'yt-dlp_linux')
+    
+    if (fs.existsSync(localPath)) {
+        customYtDlpPath = localPath
+    } else if (fs.existsSync(localPath2)) {
+        customYtDlpPath = localPath2
+    } else {
+        customYtDlpPath = execSync('which yt-dlp', { encoding: 'utf-8' }).trim()
+    }
 } catch {
-    // System yt-dlp not available
+    // yt-dlp not available
 }
 
 const ytdlOptions = {
@@ -69,77 +79,24 @@ function parseYtDlpResult(info: any, videoId: string): streamResult {
     }
 }
 
-// Strategy 1: use yt-dlp via youtube-dl-exec (needs python3)
+// Strategy 1: use yt-dlp via youtube-dl-exec
 async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
     const url = `https://www.youtube.com/watch?v=${videoId}`
 
-    // Try bundled yt-dlp first
-    try {
-        const info = await youtubedl(url, ytdlOpts) as any
-        return parseYtDlpResult(info, videoId)
-    } catch (bundledError) {
-        // If bundled fails and we have a system binary, try that
-        if (systemYtDlpPath) {
-            console.warn('Bundled yt-dlp failed, trying system binary:', systemYtDlpPath)
-            const systemYtdl = createYtdl(systemYtDlpPath)
-            const info = await systemYtdl(url, ytdlOpts) as any
-            return parseYtDlpResult(info, videoId)
-        }
-        throw bundledError
-    }
-}
+    // Use standalone binary if available, otherwise try the bundled one
+    const ytdl = customYtDlpPath ? createYtdl(customYtDlpPath) : youtubedl
 
-// Strategy 2: use play-dl (pure JavaScript, no external binaries needed)
-async function getStreamUrlWithPlayDl(videoId: string): Promise<streamResult> {
-    const url = `https://www.youtube.com/watch?v=${videoId}`
-    const info = await playdl.video_info(url)
-
-    if (info.LiveStreamData?.isLive) {
-        const hlsUrl = info.LiveStreamData.hlsManifestUrl
-        if (!hlsUrl) {
-            throw new Error(`No HLS manifest found for live stream (play-dl): ${videoId}`)
-        }
-        return { type: 'live', url: hlsUrl, expiresAt: null }
-    }
-
-    // Get audio-only formats, sorted by bitrate (highest first)
-    const formats = info.format
-        .filter((f: any) => f.mimeType?.startsWith('audio/') && f.url)
-        .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))
-
-    if (formats.length > 0) {
-        const expiresAt = Math.floor(Date.now() / 1000) + (4 * 60 * 60)
-        return { type: 'vod', url: formats[0].url!, expiresAt }
-    }
-
-    // Fall back to any format with a URL
-    const anyFormat = info.format.find((f: any) => f.url)
-    if (anyFormat?.url) {
-        const expiresAt = Math.floor(Date.now() / 1000) + (4 * 60 * 60)
-        return { type: 'vod', url: anyFormat.url, expiresAt }
-    }
-
-    throw new Error(`No playable format found (play-dl): ${videoId}`)
+    const info = await ytdl(url, ytdlOpts) as any
+    return parseYtDlpResult(info, videoId)
 }
 
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
-    // Try yt-dlp first (best quality, but needs python3)
-    // Then play-dl (pure JS, works everywhere)
     try {
         return await getStreamUrlWithYtDlp(videoId)
     } catch (ytdlError) {
         const ytdlMsg = ytdlError instanceof Error ? ytdlError.message : String(ytdlError)
-        console.warn('yt-dlp failed, trying play-dl fallback:', ytdlMsg)
-
-        try {
-            return await getStreamUrlWithPlayDl(videoId)
-        } catch (playDlError) {
-            const playDlMsg = playDlError instanceof Error ? playDlError.message : String(playDlError)
-            console.error('Both yt-dlp and play-dl failed for', videoId)
-            console.error('  yt-dlp error:', ytdlMsg)
-            console.error('  play-dl error:', playDlMsg)
-            throw new Error(`Failed to get stream url: ${ytdlMsg} | play-dl: ${playDlMsg}`)
-        }
+        console.error('yt-dlp failed for', videoId, ytdlMsg)
+        throw new Error(`Failed to get stream url: ${ytdlMsg}`)
     }
 }
 
