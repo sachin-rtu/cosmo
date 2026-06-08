@@ -6,8 +6,7 @@
   "scripts": {
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
-    "build": "tsc",
-    "postinstall": "curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux -o ./yt-dlp_linux && chmod a+rx ./yt-dlp_linux || echo 'yt-dlp download failed'"
+    "build": "tsc"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
