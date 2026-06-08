@@ -1,5 +1,6 @@
 import { Innertube, Platform } from 'youtubei.js'
-import youtubedl from 'youtube-dl-exec'
+import youtubedl, { create as createYtdl } from 'youtube-dl-exec'
+import { execSync } from 'child_process'
 
 
 // signature-protected stream URLs. Without this, the library cannot
@@ -23,19 +24,27 @@ async function getInnertube(): Promise<Innertube> {
     return innertube
 }
 
-// Primary: use yt-dlp via youtube-dl-exec
-async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
-    const info = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-        dumpSingleJson: true,
-        noCheckCertificates: true,
-        noWarnings: true,
-        preferFreeFormats: true,
-        addHeader: [
-            'referer:youtube.com',
-            'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
-        ]
-    }) as any;
+// Resolve the system yt-dlp binary path (from nix or pip install)
+let systemYtDlpPath: string | null = null
+try {
+    systemYtDlpPath = execSync('which yt-dlp', { encoding: 'utf-8' }).trim()
+} catch {
+    // System yt-dlp not available
+}
 
+const ytdlOptions = {
+    dumpSingleJson: true,
+    noCheckCertificates: true,
+    noWarnings: true,
+    preferFreeFormats: true,
+    addHeader: [
+        'referer:youtube.com',
+        'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
+    ]
+} as const;
+const ytdlOpts = { ...ytdlOptions, addHeader: [...ytdlOptions.addHeader] }
+
+function parseYtDlpResult(info: any, videoId: string): streamResult {
     if (info.is_live) {
         const manifestUrl = info.formats.find((f: any) => f.format_id === '91' || f.format_id === '92' || f.format_id === '93' || f.format_id === '94' || f.format_id === '95' || f.format_id === '96' || f.url?.includes('m3u8'))?.url || info.url;
         if (!manifestUrl) {
@@ -56,6 +65,26 @@ async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
         type: 'vod',
         url: format.url,
         expiresAt,
+    }
+}
+
+// Primary: use yt-dlp via youtube-dl-exec
+async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+
+    // Try bundled yt-dlp first
+    try {
+        const info = await youtubedl(url, ytdlOpts) as any
+        return parseYtDlpResult(info, videoId)
+    } catch (bundledError) {
+        // If bundled fails and we have a system binary, try that
+        if (systemYtDlpPath) {
+            console.warn('Bundled yt-dlp failed, trying system binary:', systemYtDlpPath)
+            const systemYtdl = createYtdl(systemYtDlpPath)
+            const info = await systemYtdl(url, ytdlOpts) as any
+            return parseYtDlpResult(info, videoId)
+        }
+        throw bundledError
     }
 }
 
