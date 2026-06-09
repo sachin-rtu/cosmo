@@ -48,14 +48,7 @@ export async function generateContextCard(title: string, artist: string): Promis
         return parsed
     } catch (err) {
         console.error(`[gemini] Failed to generate context for "${title}" by "${artist}":`, (err as Error).message)
-        return {
-            genre: 'Unknown',
-            mood_tags: [],
-            similar_artists: [],
-            fun_fact: '',
-            language: 'Unknown',
-            energy_level: 2,
-        }
+        throw err
     }
 }
 
