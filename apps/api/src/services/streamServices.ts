@@ -106,20 +106,95 @@ async function getStreamUrlWithYti(videoId: string): Promise<streamResult> {
     }
 }
 
+// Strategy 3: Piped API — runs on external IPs, bypasses Railway IP bans
+const PIPED_INSTANCES = [
+    'https://pipedapi.kavin.rocks',
+    'https://pipedapi.adminforge.de',
+    'https://pipedapi.r4fo.com',
+]
+
+async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
+    let lastError: Error | null = null
+
+    for (const instance of PIPED_INSTANCES) {
+        try {
+            const controller = new AbortController()
+            const timeout = setTimeout(() => controller.abort(), 8000)
+
+            const res = await fetch(`${instance}/streams/${videoId}`, {
+                signal: controller.signal,
+            })
+            clearTimeout(timeout)
+
+            if (!res.ok) {
+                throw new Error(`Piped ${instance} returned ${res.status}`)
+            }
+
+            const data = await res.json() as any
+
+            // Check if it's a live stream
+            if (data.livestream) {
+                const hlsUrl = data.hls
+                if (!hlsUrl) throw new Error('No HLS URL for live stream from Piped')
+                return { type: 'live', url: hlsUrl, expiresAt: null }
+            }
+
+            // Find best audio-only stream
+            const audioStreams = data.audioStreams
+            if (!audioStreams || audioStreams.length === 0) {
+                throw new Error('No audio streams from Piped')
+            }
+
+            // Sort by bitrate descending, pick the best one
+            const best = audioStreams
+                .filter((s: any) => s.url)
+                .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0]
+
+            if (!best?.url) {
+                throw new Error('No valid audio URL from Piped')
+            }
+
+            console.log(`Piped (${instance}) resolved stream for ${videoId}`)
+            return {
+                type: 'vod',
+                url: best.url,
+                expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60),
+            }
+        } catch (err) {
+            lastError = err instanceof Error ? err : new Error(String(err))
+            console.warn(`Piped instance ${instance} failed for ${videoId}:`, lastError.message)
+        }
+    }
+
+    throw lastError || new Error('All Piped instances failed')
+}
+
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
+    // Strategy 1: yt-dlp
     try {
         return await getStreamUrlWithYtDlp(videoId)
     } catch (ytdlError) {
         const ytdlMsg = ytdlError instanceof Error ? ytdlError.message : String(ytdlError)
         console.error('yt-dlp failed for', videoId, ytdlMsg)
-        
+    }
+
+    // Strategy 2: youtubei.js
+    try {
         console.log('Falling back to youtubei.js for', videoId)
-        try {
-            return await getStreamUrlWithYti(videoId)
-        } catch (ytiError) {
-            console.error('youtubei.js failed for', videoId, ytiError)
-            throw new Error(`Failed to get stream url: yt-dlp error: ${ytdlMsg}, youtubei error: ${ytiError instanceof Error ? ytiError.message : String(ytiError)}`)
-        }
+        return await getStreamUrlWithYti(videoId)
+    } catch (ytiError) {
+        const ytiMsg = ytiError instanceof Error ? ytiError.message : String(ytiError)
+        console.error('youtubei.js failed for', videoId, ytiMsg)
+    }
+
+    // Strategy 3: Piped API (external IPs, bypasses Railway bot detection)
+    try {
+        console.log('Falling back to Piped API for', videoId)
+        return await getStreamUrlWithPiped(videoId)
+    } catch (pipedError) {
+        const pipedMsg = pipedError instanceof Error ? pipedError.message : String(pipedError)
+        console.error('Piped API failed for', videoId, pipedMsg)
+        throw new Error(`All stream strategies failed for ${videoId}`)
     }
 }
 
