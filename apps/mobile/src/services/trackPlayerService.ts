@@ -13,4 +13,12 @@ export const PlaybackService = async () => {
     TrackPlayer.addEventListener(Event.RemotePrevious, () => usePlayerStore.getState().skipToPrev());
     
     TrackPlayer.addEventListener(Event.RemoteSeek, (event) => TrackPlayer.seekTo(event.position));
+
+    // Debug: log playback errors so we can see exactly why ExoPlayer rejects a URL
+    TrackPlayer.addEventListener(Event.PlayerError, (event) => {
+        console.error('[TrackPlayer] Playback error:', {
+            code: event.code,
+            message: event.message,
+        });
+    });
 };

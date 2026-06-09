@@ -136,8 +136,12 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                         }
                     }
                 }))
-            } catch (error) {
-                console.error("Failed to resolve stream for", track.title)
+            } catch (error: any) {
+                console.error("Failed to resolve stream for", track.title, {
+                    status: error?.response?.status,
+                    data: error?.response?.data,
+                    message: error?.message,
+                })
                 return // skip if we can't get a URL
             }
         }
