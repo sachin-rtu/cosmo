@@ -118,7 +118,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
         let streamUrl: string
         const prefetched = prefetchedUrls[track.videoId]
-        const isStillValid = prefetched && prefetched.expiresAt > now + 120
+        const isStillValid = prefetched && prefetched.expiresAt > now + 3600
 
         if (isStillValid) {
             streamUrl = prefetched.url
@@ -184,7 +184,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         let streamUrl = ''
 
         const already = prefetchedUrls[nextTrack.videoId]
-        if (already && already.expiresAt > now + 120) {
+        if (already && already.expiresAt > now + 3600) {
             streamUrl = already.url
         } else {
             try {

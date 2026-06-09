@@ -1,4 +1,18 @@
 import 'dotenv/config';
+
+// Intercept noisy youtubei.js logs to prevent rate limiting
+const originalWarn = console.warn;
+console.warn = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('[YOUTUBEJS]')) return;
+    originalWarn(...args);
+};
+
+const originalInfo = console.info;
+console.info = (...args) => {
+    if (typeof args[0] === 'string' && args[0].includes('[YOUTUBEJS]')) return;
+    originalInfo(...args);
+};
+
 import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Fastify from 'fastify';

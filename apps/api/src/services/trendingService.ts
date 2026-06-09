@@ -64,11 +64,14 @@ function extractTracksFromShelf(contents: any[]): TrendingTrack[] {
             const videoId = item.endpoint?.payload?.videoId || (item.id?.length === 11 ? item.id : null)
             if (!videoId || videoId.length !== 11) continue
 
+            let thumbUrl = item.thumbnail?.[0]?.url;
+            if (thumbUrl && thumbUrl.startsWith('//')) thumbUrl = 'https:' + thumbUrl;
+            
             tracks.push({
                 videoId,
                 title: item.title?.text ?? 'Unknown',
                 artist: item.subtitle?.text ?? item.artists?.[0]?.name ?? 'Unknown',
-                thumbnail: item.thumbnail?.[0]?.url ?? null,
+                thumbnail: thumbUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
                 durationMs: 0,
             })
         } else if (item instanceof YTNodes.MusicResponsiveListItem) {
@@ -76,11 +79,14 @@ function extractTracksFromShelf(contents: any[]): TrendingTrack[] {
             const videoId = item.endpoint?.payload?.videoId || (item.id?.length === 11 ? item.id : null)
             if (!videoId || videoId.length !== 11) continue
 
+            let thumbUrl = item.thumbnails?.[0]?.url;
+            if (thumbUrl && thumbUrl.startsWith('//')) thumbUrl = 'https:' + thumbUrl;
+
             tracks.push({
                 videoId,
                 title: item.title ?? item.name ?? 'Unknown',
                 artist: item.artists?.[0]?.name ?? item.authors?.[0]?.name ?? 'Unknown',
-                thumbnail: item.thumbnails?.[0]?.url ?? null,
+                thumbnail: thumbUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
                 durationMs: (item.duration?.seconds ?? 0) * 1000,
             })
         }
@@ -104,11 +110,14 @@ async function searchFallback(yt: Innertube): Promise<TrendingTrack[]> {
                     const videoId = item.endpoint?.payload?.videoId || (item.id?.length === 11 ? item.id : null)
                     if (!videoId || videoId.length !== 11) continue
 
+                    let thumbUrl = item.thumbnails?.[0]?.url;
+                    if (thumbUrl && thumbUrl.startsWith('//')) thumbUrl = 'https:' + thumbUrl;
+
                     tracks.push({
                         videoId,
                         title: item.title ?? item.name ?? 'Unknown',
                         artist: item.artists?.[0]?.name ?? item.authors?.[0]?.name ?? 'Unknown',
-                        thumbnail: item.thumbnails?.[0]?.url ?? null,
+                        thumbnail: thumbUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
                         durationMs: (item.duration?.seconds ?? 0) * 1000,
                     })
 

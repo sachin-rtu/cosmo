@@ -129,11 +129,17 @@ export async function searchTracks(query: string) {
 
     return results.videos
         .slice(0, 10)
-        .map((video: any) => ({
-            videoId: video.id,
-            title: video.title.text ?? 'Unknown',
-            artist: video.author?.name ?? 'Unknown',
-            durationMs: (video.duration?.seconds ?? 0) * 1000,
-            thumbnail: video.thumbnails?.[0]?.url ?? null,
-        }))
+        .map((video: any) => {
+            let thumbUrl = video.thumbnails?.[0]?.url;
+            if (thumbUrl && thumbUrl.startsWith('//')) {
+                thumbUrl = 'https:' + thumbUrl;
+            }
+            return {
+                videoId: video.id,
+                title: video.title.text ?? 'Unknown',
+                artist: video.author?.name ?? 'Unknown',
+                durationMs: (video.duration?.seconds ?? 0) * 1000,
+                thumbnail: thumbUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+            };
+        })
 }
