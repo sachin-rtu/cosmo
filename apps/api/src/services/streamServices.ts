@@ -107,16 +107,52 @@ async function getStreamUrlWithYti(videoId: string): Promise<streamResult> {
 }
 
 // Strategy 3: Piped API — runs on external IPs, bypasses Railway IP bans
-const PIPED_INSTANCES = [
-    'https://pipedapi.kavin.rocks',
-    'https://pipedapi.adminforge.de',
-    'https://pipedapi.r4fo.com',
+// Dynamically fetch working Piped API instances, refresh every 30 minutes
+let cachedPipedInstances: string[] = []
+let pipedInstancesFetchedAt = 0
+const PIPED_INSTANCES_TTL = 30 * 60 * 1000 // 30 min
+
+const FALLBACK_PIPED_INSTANCES = [
+    'https://api.piped.private.coffee',
 ]
 
+async function getPipedInstances(): Promise<string[]> {
+    if (cachedPipedInstances.length > 0 && Date.now() - pipedInstancesFetchedAt < PIPED_INSTANCES_TTL) {
+        return cachedPipedInstances
+    }
+
+    try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+        const res = await fetch('https://piped-instances.kavin.rocks/', { signal: controller.signal })
+        clearTimeout(timeout)
+
+        if (!res.ok) throw new Error(`Registry returned ${res.status}`)
+        const list = await res.json() as any[]
+
+        const urls = list
+            .filter((i: any) => i.api_url && i.uptime_24h > 90)
+            .sort((a: any, b: any) => (b.uptime_24h || 0) - (a.uptime_24h || 0))
+            .map((i: any) => i.api_url)
+
+        if (urls.length > 0) {
+            cachedPipedInstances = urls
+            pipedInstancesFetchedAt = Date.now()
+            console.log(`Piped: loaded ${urls.length} instances from registry`)
+            return urls
+        }
+    } catch (err) {
+        console.warn('Piped: failed to fetch instance registry:', (err as Error).message)
+    }
+
+    return FALLBACK_PIPED_INSTANCES
+}
+
 async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
+    const instances = await getPipedInstances()
     let lastError: Error | null = null
 
-    for (const instance of PIPED_INSTANCES) {
+    for (const instance of instances) {
         try {
             const controller = new AbortController()
             const timeout = setTimeout(() => controller.abort(), 8000)
@@ -139,27 +175,35 @@ async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
                 return { type: 'live', url: hlsUrl, expiresAt: null }
             }
 
-            // Find best audio-only stream
-            const audioStreams = data.audioStreams
-            if (!audioStreams || audioStreams.length === 0) {
-                throw new Error('No audio streams from Piped')
+            // Try audio-only streams first
+            const audioStreams = data.audioStreams || []
+            const audioWithUrl = audioStreams.filter((s: any) => s.url)
+            if (audioWithUrl.length > 0) {
+                const best = audioWithUrl.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0]
+                console.log(`Piped (${instance}) resolved audio stream for ${videoId}`)
+                return {
+                    type: 'vod',
+                    url: best.url,
+                    expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60),
+                }
             }
 
-            // Sort by bitrate descending, pick the best one
-            const best = audioStreams
-                .filter((s: any) => s.url)
-                .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0]
-
-            if (!best?.url) {
-                throw new Error('No valid audio URL from Piped')
+            // Fallback: use video streams that include audio (videoOnly=false)
+            const videoStreams = data.videoStreams || []
+            const withAudio = videoStreams.filter((s: any) => s.url && s.videoOnly === false)
+            if (withAudio.length > 0) {
+                // Prefer LBRY (Odysee CDN) or lowest quality video (saves bandwidth for audio-only use)
+                const lbry = withAudio.find((s: any) => s.quality === 'LBRY')
+                const pick = lbry || withAudio[withAudio.length - 1]
+                console.log(`Piped (${instance}) resolved video+audio stream for ${videoId} (quality: ${pick.quality})`)
+                return {
+                    type: 'vod',
+                    url: pick.url,
+                    expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60),
+                }
             }
 
-            console.log(`Piped (${instance}) resolved stream for ${videoId}`)
-            return {
-                type: 'vod',
-                url: best.url,
-                expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60),
-            }
+            throw new Error('No audio or combined streams from Piped')
         } catch (err) {
             lastError = err instanceof Error ? err : new Error(String(err))
             console.warn(`Piped instance ${instance} failed for ${videoId}:`, lastError.message)
