@@ -1,4 +1,7 @@
 import 'dotenv/config';
+import dns from 'node:dns';
+
+dns.setDefaultResultOrder('ipv4first');
 
 // Intercept noisy youtubei.js logs to prevent rate limiting
 const originalWarn = console.warn;

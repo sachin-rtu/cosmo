@@ -15,16 +15,16 @@ export type streamResult =
     | { type: 'vod'; url: string; expiresAt: number }
     | { type: 'live'; url: string; expiresAt: null }
 
-let innertube: Innertube | null = null
+let innertubePromise: Promise<Innertube> | null = null
 
 async function getInnertube(): Promise<Innertube> {
-    if (!innertube) {
-        innertube = await Innertube.create({
+    if (!innertubePromise) {
+        innertubePromise = Innertube.create({
             retrieve_player: true,
             generate_session_locally: true
         })
     }
-    return innertube
+    return innertubePromise
 }
 
 // Resolve the yt-dlp binary path (standalone linux binary or system)
