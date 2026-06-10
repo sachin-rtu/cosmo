@@ -1,6 +1,7 @@
 import { Innertube, Platform } from 'youtubei.js'
 import youtubedl, { create as createYtdl } from 'youtube-dl-exec'
 import { execSync } from 'child_process'
+import play from 'play-dl'
 import path from 'path'
 import fs from 'fs'
 
@@ -292,6 +293,26 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
     } catch (cobaltError) {
         const cobaltMsg = cobaltError instanceof Error ? cobaltError.message : String(cobaltError)
         console.error('Cobalt API failed for', videoId, cobaltMsg)
+    }
+
+    // Strategy 5: play-dl (Very reliable for Discord bots, handles bot checks internally)
+    try {
+        console.log('Falling back to play-dl for', videoId)
+        const info = await play.video_info(`https://www.youtube.com/watch?v=${videoId}`)
+        const format = info.format.find((f: any) => f.hasAudio && !f.hasVideo) || info.format.find((f: any) => f.hasAudio)
+        
+        if (format && format.url) {
+            console.log('play-dl resolved stream for', videoId)
+            return {
+                type: 'vod',
+                url: format.url,
+                expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60)
+            }
+        }
+        throw new Error('play-dl returned no audio formats')
+    } catch (playDlError) {
+        const playDlMsg = playDlError instanceof Error ? playDlError.message : String(playDlError)
+        console.error('play-dl failed for', videoId, playDlMsg)
         throw new Error(`All stream strategies failed for ${videoId}`)
     }
 }
