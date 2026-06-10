@@ -213,6 +213,51 @@ async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
     throw lastError || new Error('All Piped instances failed')
 }
 
+// Strategy 4: Cobalt Tools API
+async function getStreamUrlWithCobalt(videoId: string): Promise<streamResult> {
+    const url = `https://www.youtube.com/watch?v=${videoId}`
+    try {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 8000)
+
+        const res = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+            },
+            body: JSON.stringify({
+                url,
+                downloadMode: 'audio',
+                youtubeBetterAudio: true
+            }),
+            signal: controller.signal
+        })
+        clearTimeout(timeout)
+
+        if (!res.ok) {
+            throw new Error(`Cobalt returned ${res.status}`)
+        }
+
+        const data = await res.json() as any
+        
+        if (data.status === 'stream' || data.status === 'redirect') {
+            return {
+                type: 'vod',
+                url: data.url,
+                expiresAt: Math.floor(Date.now() / 1000) + (4 * 60 * 60)
+            }
+        }
+        
+        throw new Error('Cobalt failed to return a stream URL: ' + JSON.stringify(data))
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        console.warn(`Cobalt API failed for ${videoId}:`, msg)
+        throw new Error(`Cobalt failed: ${msg}`)
+    }
+}
+
 export async function getStreamUrl(videoId: string): Promise<streamResult> {
     // Strategy 1: yt-dlp
     try {
@@ -238,6 +283,15 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
     } catch (pipedError) {
         const pipedMsg = pipedError instanceof Error ? pipedError.message : String(pipedError)
         console.error('Piped API failed for', videoId, pipedMsg)
+    }
+    
+    // Strategy 4: Cobalt API
+    try {
+        console.log('Falling back to Cobalt API for', videoId)
+        return await getStreamUrlWithCobalt(videoId)
+    } catch (cobaltError) {
+        const cobaltMsg = cobaltError instanceof Error ? cobaltError.message : String(cobaltError)
+        console.error('Cobalt API failed for', videoId, cobaltMsg)
         throw new Error(`All stream strategies failed for ${videoId}`)
     }
 }
