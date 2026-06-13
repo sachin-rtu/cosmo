@@ -60,6 +60,7 @@ export default function NowPlayingScreen() {
     const [settingsModalVisible, setSettingsModalVisible] = useState(false)
     const [timerModalVisible, setTimerModalVisible] = useState(false)
     const [sleepTimeRemaining, setSleepTimeRemaining] = useState<number | null>(null)
+    const [sleepTimerMode, setSleepTimerMode] = useState<'off' | 'time' | 'track'>('off')
 
     const [playlistModalVisible, setPlaylistModalVisible] = useState(false)
     const { session } = useAuthStore()
@@ -103,8 +104,13 @@ export default function NowPlayingScreen() {
             const timer = await TrackPlayer.getSleepTimer()
             if (timer?.type === 'time') {
                 setSleepTimeRemaining(Math.ceil(timer.remainingSeconds))
+                setSleepTimerMode('time')
+            } else if (timer?.type === 'mediaItem') {
+                setSleepTimeRemaining(null)
+                setSleepTimerMode('track')
             } else {
                 setSleepTimeRemaining(null)
+                setSleepTimerMode('off')
             }
         }, 1000)
         return () => clearInterval(interval)
@@ -125,10 +131,18 @@ export default function NowPlayingScreen() {
         if (minutes === 0) {
             await TrackPlayer.cancelSleepTimer()
             setSleepTimeRemaining(null)
+            setSleepTimerMode('off')
+        } else if (minutes === -1) {
+            // End of track
+            const currentQueueIdx = await TrackPlayer.getActiveMediaItemIndex()
+            await TrackPlayer.sleepAfterMediaItemAtIndex(currentQueueIdx ?? 0)
+            setSleepTimeRemaining(null)
+            setSleepTimerMode('track')
         } else {
             // Fade out over the last 15 seconds for a graceful exit
             await TrackPlayer.sleepAfterTime(minutes * 60, { fadeOutSeconds: 15 })
             setSleepTimeRemaining(minutes * 60)
+            setSleepTimerMode('time')
         }
         setTimerModalVisible(false)
     }
@@ -288,11 +302,14 @@ export default function NowPlayingScreen() {
                     style={styles.timerBtn}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={[styles.timerIcon, sleepTimeRemaining !== null && styles.timerIconActive]}>
+                    <Text style={[styles.timerIcon, sleepTimerMode !== 'off' && styles.timerIconActive]}>
                         🌙
                     </Text>
-                    {sleepTimeRemaining !== null && (
+                    {sleepTimerMode === 'time' && sleepTimeRemaining !== null && (
                         <Text style={styles.timerText}>{formatSleepTime(sleepTimeRemaining)}</Text>
+                    )}
+                    {sleepTimerMode === 'track' && (
+                        <Text style={styles.timerText}>Track</Text>
                     )}
                 </TouchableOpacity>
             </View>
@@ -590,7 +607,11 @@ export default function NowPlayingScreen() {
                             <View style={styles.settingsTextContainer}>
                                 <Text style={styles.settingsRowTitle}>Sleep Timer</Text>
                                 <Text style={styles.settingsRowSubtitle}>
-                                    {sleepTimeRemaining ? `Ends in ${formatSleepTime(sleepTimeRemaining)}` : 'Off'}
+                                    {sleepTimerMode === 'time' && sleepTimeRemaining 
+                                        ? `Ends in ${formatSleepTime(sleepTimeRemaining)}` 
+                                        : sleepTimerMode === 'track'
+                                        ? 'Ends after track'
+                                        : 'Off'}
                                 </Text>
                             </View>
                             <Ionicons name="chevron-forward" size={20} color="#666" />
@@ -669,6 +690,7 @@ export default function NowPlayingScreen() {
                         <View style={styles.timerOptions}>
                             {[
                                 { label: 'Off', minutes: 0 },
+                                { label: 'End of Track', minutes: -1 },
                                 { label: '15 mins', minutes: 15 },
                                 { label: '30 mins', minutes: 30 },
                                 { label: '45 mins', minutes: 45 },
