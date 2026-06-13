@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Pressable,
-  FlatList, StyleSheet, ActivityIndicator,
-  SafeAreaView, Image, StatusBar, Modal, ScrollView
+  StyleSheet, ActivityIndicator,
+  SafeAreaView, StatusBar, Modal, ScrollView
 } from 'react-native'
+import { Image } from 'expo-image'
 import { BlurView } from 'expo-blur'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -187,10 +188,10 @@ export default function SearchScreen() {
             activeOpacity={0.8}
           >
             <View style={styles.moodBannerContent}>
-              <Text style={styles.moodBannerTitle}>AI Mood Playlist ✨</Text>
+              <Text style={styles.moodBannerTitle}>AI Mood Playlist <Ionicons name="sparkles" size={16} color="#fff" /></Text>
               <Text style={styles.moodBannerSubtitle}>Tell Gemini how you feel and get a custom vibe</Text>
             </View>
-            <Text style={styles.moodBannerArrow}>→</Text>
+            <Ionicons name="arrow-forward" size={20} color="#666" />
           </TouchableOpacity>
         )}
 
@@ -230,7 +231,7 @@ export default function SearchScreen() {
         
         {hasSearched && results.length === 0 && !loading && !error && (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🔍</Text>
+            <Ionicons name="search" size={48} color="#666" style={{ marginBottom: 16 }} />
             <Text style={styles.emptyTitle}>No results found</Text>
             <Text style={styles.emptySubtitle}>Try searching for something else</Text>
           </View>
@@ -257,7 +258,7 @@ export default function SearchScreen() {
             )}
 
             <TouchableOpacity style={styles.modalOption} onPress={handleAddToQueue}>
-              <Text style={styles.modalOptionIcon}>+</Text>
+              <Ionicons name="add" size={24} color="#fff" style={{ width: 32, textAlign: 'center' }} />
               <Text style={styles.modalOptionText}>Add to Queue</Text>
             </TouchableOpacity>
 

@@ -1,8 +1,11 @@
 import React, { useState } from 'react'
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
-    SafeAreaView, StatusBar, ActivityIndicator, Image, FlatList
+    SafeAreaView, StatusBar, ActivityIndicator
 } from 'react-native'
+import { Image } from 'expo-image'
+import { FlashList } from '@shopify/flash-list'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import type { RootStackParams } from '../navigation'
@@ -79,7 +82,7 @@ export default function MoodScreen() {
                     style={styles.backBtn}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={styles.backArrow}>←</Text>
+                    <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>AI Mood Playlist</Text>
                 <View style={{ width: 40 }} />
@@ -98,13 +101,14 @@ export default function MoodScreen() {
                         <Text style={styles.resultMood}>"{moodText}"</Text>
                         
                         <TouchableOpacity style={styles.playAllBtn} onPress={handlePlayAll}>
-                            <Text style={styles.playAllIcon}>▶</Text>
+                            <Ionicons name="play" size={20} color="#fff" />
                             <Text style={styles.playAllText}>Play Playlist</Text>
                         </TouchableOpacity>
                     </View>
 
-                    <FlatList
+                    <FlashList
                         data={playlist}
+                        estimatedItemSize={76}
                         keyExtractor={(item, index) => item.videoId + index}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={styles.playlistList}
@@ -163,7 +167,7 @@ export default function MoodScreen() {
                             onPress={() => handleGenerate()}
                             disabled={!moodText.trim()}
                         >
-                            <Text style={styles.generateBtnText}>✨</Text>
+                            <Ionicons name="sparkles" size={20} color="#fff" />
                         </TouchableOpacity>
                     </View>
 
