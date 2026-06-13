@@ -47,7 +47,8 @@ export default function NowPlayingScreen() {
 
     const { 
         queue, currentIndex, skipToNext, skipToPrev,
-        isShuffled, repeatMode, toggleShuffle, toggleRepeat 
+        isShuffled, repeatMode, toggleShuffle, toggleRepeat,
+        crossfadeEnabled, crossfadeDuration, setCrossfadeEnabled, setCrossfadeDuration
     } = usePlayerStore()
     const currentTrack = queue[currentIndex]
 
@@ -661,41 +662,37 @@ export default function NowPlayingScreen() {
                             <View style={styles.settingsTextContainer}>
                                 <Text style={styles.settingsRowTitle}>Crossfade</Text>
                                 <Text style={styles.settingsRowSubtitle}>
-                                    {usePlayerStore.getState().crossfadeEnabled 
-                                        ? `${usePlayerStore.getState().crossfadeDuration}s` 
+                                    {crossfadeEnabled 
+                                        ? `${crossfadeDuration}s` 
                                         : 'Off'}
                                 </Text>
                             </View>
                             <TouchableOpacity 
-                                style={[styles.toggleBtn, usePlayerStore.getState().crossfadeEnabled && styles.toggleBtnActive]}
-                                onPress={() => {
-                                    usePlayerStore.getState().setCrossfadeEnabled(!usePlayerStore.getState().crossfadeEnabled)
-                                }}
+                                style={[styles.toggleBtn, crossfadeEnabled && styles.toggleBtnActive]}
+                                onPress={() => setCrossfadeEnabled(!crossfadeEnabled)}
                             >
-                                <View style={[styles.toggleKnob, usePlayerStore.getState().crossfadeEnabled && styles.toggleKnobActive]} />
+                                <View style={[styles.toggleKnob, crossfadeEnabled && styles.toggleKnobActive]} />
                             </TouchableOpacity>
                         </View>
                         
-                        {usePlayerStore.getState().crossfadeEnabled && (
+                        {crossfadeEnabled && (
                             <View style={styles.sliderContainer}>
                                 <Text style={styles.sliderLabel}>1s</Text>
                                 <View style={styles.sliderTrackWrapper}>
                                     <View style={styles.sliderBg} />
-                                    <View style={[styles.sliderFill, { width: `${(usePlayerStore.getState().crossfadeDuration / 12) * 100}%` }]} />
+                                    <View style={[styles.sliderFill, { width: `${(crossfadeDuration / 12) * 100}%` }]} />
                                     {/* Tap zones for adjusting crossfade */}
                                     <View style={styles.sliderControls}>
                                         <TouchableOpacity 
                                             style={styles.sliderControlHalf} 
                                             onPress={() => {
-                                                const v = usePlayerStore.getState().crossfadeDuration
-                                                if (v > 1) usePlayerStore.getState().setCrossfadeDuration(v - 1)
+                                                if (crossfadeDuration > 1) setCrossfadeDuration(crossfadeDuration - 1)
                                             }} 
                                         />
                                         <TouchableOpacity 
                                             style={styles.sliderControlHalf} 
                                             onPress={() => {
-                                                const v = usePlayerStore.getState().crossfadeDuration
-                                                if (v < 12) usePlayerStore.getState().setCrossfadeDuration(v + 1)
+                                                if (crossfadeDuration < 12) setCrossfadeDuration(crossfadeDuration + 1)
                                             }} 
                                         />
                                     </View>
