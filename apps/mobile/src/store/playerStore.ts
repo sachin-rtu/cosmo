@@ -11,10 +11,10 @@ import { stopCrossfade } from '../services/crossfadeService'
 import { getLocalFileUri } from '../services/downloadService'
 
 // Helper: resolve stream URL with client-side first, server fallback
-async function resolveStreamUrl(videoId: string): Promise<{ url: string; expiresAt: number }> {
+async function resolveStreamUrl(videoId: string, quality: 'high' | 'low'): Promise<{ url: string; expiresAt: number }> {
     // Strategy 1: Client-side InnerTube (from phone's residential IP — most reliable)
     try {
-        const result = await resolveStreamClientSide(videoId)
+        const result = await resolveStreamClientSide(videoId, quality)
         console.log(`[Stream] Client-side resolved ${videoId}`)
         return { url: result.url, expiresAt: result.expiresAt }
     } catch (clientErr: any) {
@@ -23,8 +23,8 @@ async function resolveStreamUrl(videoId: string): Promise<{ url: string; expires
 
     // Strategy 2: Server API fallback (Railway — may work via Piped/LBRY cache)
     try {
-        const response = await api.get(`/stream/${videoId}`)
-        console.log(`[Stream] Server resolved ${videoId}`)
+        const response = await api.get(`/stream/${videoId}?quality=${quality}`)
+        console.log(`[Stream] Server resolved ${videoId} (quality: ${quality})`)
         return { url: response.data.url, expiresAt: response.data.expiresAt }
     } catch (serverErr: any) {
         console.error(`[Stream] Server also failed for ${videoId}:`, serverErr.message)
@@ -61,6 +61,8 @@ interface PlayerStore {
     crossfadeEnabled: boolean
     crossfadeDuration: number
 
+    audioQuality: 'high' | 'low'
+
     // Actions 
     playQueue: (tracks: CosmoTrack[], startIndex?: number) => Promise<void>
     addToQueue: (track: CosmoTrack) => Promise<void>
@@ -76,6 +78,8 @@ interface PlayerStore {
     
     setCrossfadeEnabled: (enabled: boolean) => void
     setCrossfadeDuration: (duration: number) => void
+
+    setAudioQuality: (quality: 'high' | 'low') => void
 }
 
 // Helper: build a single RNTP media item
@@ -102,6 +106,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
     crossfadeEnabled: playerStorage.getBoolean('crossfade-enabled') ?? false,
     crossfadeDuration: playerStorage.getNumber('crossfade-duration') ?? 5,
+    audioQuality: (playerStorage.getString('audio-quality') as 'high' | 'low') || 'high',
 
     setCrossfadeEnabled: (enabled) => {
         playerStorage.set('crossfade-enabled', enabled)
@@ -110,6 +115,10 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     setCrossfadeDuration: (duration) => {
         playerStorage.set('crossfade-duration', duration)
         set({ crossfadeDuration: duration })
+    },
+    setAudioQuality: (quality) => {
+        playerStorage.set('audio-quality', quality)
+        set({ audioQuality: quality })
     },
 
     toggleFavorite: (videoId) => {
@@ -184,7 +193,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             streamUrl = prefetched.url
         } else {
             try {
-                const resolved = await resolveStreamUrl(track.videoId)
+                const { audioQuality } = get()
+                const resolved = await resolveStreamUrl(track.videoId, audioQuality)
                 streamUrl = resolved.url
 
                 set(state => ({
@@ -284,7 +294,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             streamUrl = already.url
         } else {
             try {
-                const resolved = await resolveStreamUrl(nextTrack.videoId)
+                const { audioQuality } = get()
+                const resolved = await resolveStreamUrl(nextTrack.videoId, audioQuality)
                 streamUrl = resolved.url
 
                 set(state => ({
@@ -362,7 +373,8 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
         // Prefetch the stream URL for this track in the background
         try {
-            const resolved = await resolveStreamUrl(track.videoId)
+            const { audioQuality } = get()
+            const resolved = await resolveStreamUrl(track.videoId, audioQuality)
 
             set(state => ({
                 prefetchedUrls: {

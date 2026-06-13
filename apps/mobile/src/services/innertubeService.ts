@@ -118,7 +118,7 @@ interface StreamFormat {
     approxDurationMs?: string
 }
 
-function selectBestAudioFormat(formats: StreamFormat[]): StreamFormat | null {
+function selectBestAudioFormat(formats: StreamFormat[], quality: 'high' | 'low' = 'high'): StreamFormat | null {
     // Only consider formats that have a direct URL (no cipher)
     const audioFormats = formats.filter(
         (f) => f.mimeType?.includes('audio/') && f.url && !f.signatureCipher
@@ -126,12 +126,17 @@ function selectBestAudioFormat(formats: StreamFormat[]): StreamFormat | null {
 
     if (audioFormats.length === 0) return null
 
-    // Prefer opus/webm > mp4a/aac, then highest bitrate
+    // If high quality: Prefer opus/webm > mp4a/aac, then highest bitrate
+    // If low quality (Data Saver): Lowest bitrate
     const sorted = audioFormats.sort((a, b) => {
-        const aIsOpus = a.mimeType.includes('opus') ? 1 : 0
-        const bIsOpus = b.mimeType.includes('opus') ? 1 : 0
-        if (aIsOpus !== bIsOpus) return bIsOpus - aIsOpus
-        return (b.bitrate || 0) - (a.bitrate || 0)
+        if (quality === 'low') {
+            return (a.bitrate || 0) - (b.bitrate || 0)
+        } else {
+            const aIsOpus = a.mimeType.includes('opus') ? 1 : 0
+            const bIsOpus = b.mimeType.includes('opus') ? 1 : 0
+            if (aIsOpus !== bIsOpus) return bIsOpus - aIsOpus
+            return (b.bitrate || 0) - (a.bitrate || 0)
+        }
     })
 
     return sorted[0]
@@ -141,7 +146,8 @@ function selectBestAudioFormat(formats: StreamFormat[]): StreamFormat | null {
 
 async function fetchWithClient(
     videoId: string,
-    client: InnerTubeClient
+    client: InnerTubeClient,
+    quality: 'high' | 'low' = 'high'
 ): Promise<string> {
     const visitorData = getOrCreateVisitorData()
     const cpn = generateCPN()
@@ -266,13 +272,14 @@ export interface ClientStreamResult {
  * Throws if all clients fail or the video is genuinely unplayable.
  */
 export async function resolveStreamClientSide(
-    videoId: string
+    videoId: string,
+    quality: 'high' | 'low' = 'high'
 ): Promise<ClientStreamResult> {
     let lastError: Error | null = null
 
     for (const client of CLIENTS) {
         try {
-            const url = await fetchWithClient(videoId, client)
+            const url = await fetchWithClient(videoId, client, quality)
             return {
                 url,
                 // YouTube stream URLs typically expire in ~6 hours,

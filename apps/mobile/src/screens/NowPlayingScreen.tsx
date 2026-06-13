@@ -48,7 +48,8 @@ export default function NowPlayingScreen() {
     const { 
         queue, currentIndex, skipToNext, skipToPrev,
         isShuffled, repeatMode, toggleShuffle, toggleRepeat,
-        crossfadeEnabled, crossfadeDuration, setCrossfadeEnabled, setCrossfadeDuration
+        crossfadeEnabled, crossfadeDuration, setCrossfadeEnabled, setCrossfadeDuration,
+        audioQuality, setAudioQuality
     } = usePlayerStore()
     const currentTrack = queue[currentIndex]
 
@@ -700,6 +701,23 @@ export default function NowPlayingScreen() {
                                 <Text style={styles.sliderLabel}>12s</Text>
                             </View>
                         )}
+
+                        {/* Audio Quality Option */}
+                        <View style={styles.settingsRow}>
+                            <Feather name="activity" size={24} color="#fff" style={styles.settingsIcon} />
+                            <View style={styles.settingsTextContainer}>
+                                <Text style={styles.settingsRowTitle}>Audio Quality</Text>
+                                <Text style={styles.settingsRowSubtitle}>
+                                    {audioQuality === 'high' ? 'High Quality' : 'Data Saver'}
+                                </Text>
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.toggleBtn, audioQuality === 'high' && styles.toggleBtnActive]}
+                                onPress={() => setAudioQuality(audioQuality === 'high' ? 'low' : 'high')}
+                            >
+                                <View style={[styles.toggleKnob, audioQuality === 'high' && styles.toggleKnobActive]} />
+                            </TouchableOpacity>
+                        </View>
 
                         <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSettingsModalVisible(false)}>
                             <Text style={styles.modalCancelText}>Close</Text>

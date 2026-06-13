@@ -97,10 +97,10 @@ async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
     return parseYtDlpResult(info, videoId)
 }
 
-async function getStreamUrlWithYti(videoId: string): Promise<streamResult> {
+async function getStreamUrlWithYti(videoId: string, quality: 'high' | 'low'): Promise<streamResult> {
     const yt = await getInnertube()
     const info = await yt.getInfo(videoId)
-    const format = info.chooseFormat({ type: 'audio', quality: 'best' })
+    const format = info.chooseFormat({ type: 'audio', quality: quality === 'low' ? 'lowest' : 'best' })
     if (!format || !format.url) {
         throw new Error(`No audio format found for video: ${videoId}`)
     }
@@ -153,7 +153,7 @@ async function getPipedInstances(): Promise<string[]> {
     return FALLBACK_PIPED_INSTANCES
 }
 
-async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
+async function getStreamUrlWithPiped(videoId: string, quality: 'high' | 'low'): Promise<streamResult> {
     const instances = await getPipedInstances()
     let lastError: Error | null = null
 
@@ -184,7 +184,8 @@ async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
             const audioStreams = data.audioStreams || []
             const audioWithUrl = audioStreams.filter((s: any) => s.url)
             if (audioWithUrl.length > 0) {
-                const best = audioWithUrl.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0]
+                const sorted = audioWithUrl.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))
+                const best = quality === 'low' ? sorted[sorted.length - 1] : sorted[0]
                 logger.info(`Piped (${instance}) resolved audio stream for ${videoId}`)
                 return {
                     type: 'vod',
@@ -263,7 +264,7 @@ async function getStreamUrlWithCobalt(videoId: string): Promise<streamResult> {
     }
 }
 
-export async function getStreamUrl(videoId: string): Promise<streamResult> {
+export async function getStreamUrl(videoId: string, quality: 'high' | 'low' = 'high'): Promise<streamResult> {
     // Strategy 1: yt-dlp
     try {
         return await getStreamUrlWithYtDlp(videoId)
@@ -275,7 +276,7 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
     // Strategy 2: youtubei.js
     try {
         logger.info('Falling back to youtubei.js for', videoId)
-        return await getStreamUrlWithYti(videoId)
+        return await getStreamUrlWithYti(videoId, quality)
     } catch (ytiError) {
         const ytiMsg = ytiError instanceof Error ? ytiError.message : String(ytiError)
         logger.error('youtubei.js failed for', videoId, ytiMsg)
@@ -284,7 +285,7 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
     // Strategy 3: Piped API (external IPs, bypasses Railway bot detection)
     try {
         logger.info('Falling back to Piped API for', videoId)
-        return await getStreamUrlWithPiped(videoId)
+        return await getStreamUrlWithPiped(videoId, quality)
     } catch (pipedError) {
         const pipedMsg = pipedError instanceof Error ? pipedError.message : String(pipedError)
         logger.error('Piped API failed for', videoId, pipedMsg)

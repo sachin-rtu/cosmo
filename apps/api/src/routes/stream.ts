@@ -19,15 +19,16 @@ export async function streamRoutes(fastify: FastifyInstance) {
 
         const { videoId } = request.params as { videoId: string }
 
-        const { forceRefresh } = request.query as { forceRefresh?: string }
+        const { forceRefresh, quality } = request.query as { forceRefresh?: string, quality?: 'high' | 'low' }
         const shouldForceRefresh = forceRefresh === 'true'
+        const streamQuality = quality === 'low' ? 'low' : 'high'
 
-        const cacheKey = `stream:${videoId}`
+        const cacheKey = `stream:${streamQuality}:${videoId}`
 
         const result = await getOrSet(
             fastify,
             cacheKey,
-            () => getStreamUrl(videoId),
+            () => getStreamUrl(videoId, streamQuality),
             {
                 ttlSeconds: 14400,
                 forceRefresh: shouldForceRefresh,
