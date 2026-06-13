@@ -1,8 +1,9 @@
 import type { FastifyInstance } from 'fastify'
-import { LrcLib } from 'lrclib-api'
+// @ts-ignore
+import { Client } from 'lrclib-api'
 import { getOrSet } from '../plugins/cacheHelpers'
 
-const lrclib = new LrcLib()
+const lrclib = new Client()
 
 export async function lyricsRoutes(fastify: FastifyInstance) {
     fastify.get('/', async (request, reply) => {
@@ -21,7 +22,7 @@ export async function lyricsRoutes(fastify: FastifyInstance) {
                 try {
                     // lrclib-api get() or search() might return { syncedLyrics, plainLyrics } 
                     // But based on instructions, we call getSynced() 
-                    const syncedRaw = await lrclib.get(title, artist).catch(() => null)
+                    const syncedRaw = await lrclib.findLyrics({ track_name: title, artist_name: artist }).catch(() => null)
                     let synced: { time: number; text: string }[] | null = null
                     let plain: string | null = null
 
@@ -32,13 +33,20 @@ export async function lyricsRoutes(fastify: FastifyInstance) {
                     }
 
                     if (!synced && typeof (lrclib as any).getSynced === 'function') {
-                        const s = await (lrclib as any).getSynced(title, artist).catch(() => null)
+                        const s = await (lrclib as any).getSynced({ track_name: title, artist_name: artist }).catch(() => null)
                         if (typeof s === 'string') synced = parseLrc(s)
-                        else if (Array.isArray(s)) synced = s
+                        else if (Array.isArray(s)) {
+                            synced = s.map((line: any) => ({
+                                time: line.startTime !== undefined ? line.startTime : line.time,
+                                text: line.text
+                            }))
+                        }
                     }
 
                     if (!synced && !plain && typeof (lrclib as any).getUnsynced === 'function') {
-                        plain = await (lrclib as any).getUnsynced(title, artist).catch(() => null)
+                        const p = await (lrclib as any).getUnsynced({ track_name: title, artist_name: artist }).catch(() => null)
+                        if (typeof p === 'string') plain = p
+                        else if (Array.isArray(p)) plain = p.map((line: any) => line.text).join('\n')
                     }
 
                     return { synced: synced || null, plain: plain || null }
