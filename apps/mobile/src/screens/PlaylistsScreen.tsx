@@ -7,7 +7,7 @@ import { FlashList } from '@shopify/flash-list'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { usePlaylistStore } from '../store/playlistStore'
+import { usePlaylistStore, type Playlist } from '../store/playlistStore'
 import { useAuthStore } from '../store/authStore'
 import EmptyState from '../components/EmptyState'
 
@@ -82,8 +82,8 @@ export default function PlaylistsScreen() {
 
             <FlashList
                 data={playlists}
-                estimatedItemSize={80}
-                keyExtractor={(item) => item.id}
+                {...({ estimatedItemSize: 80 } as any)}
+                keyExtractor={(item: Playlist) => item.id}
                 contentContainerStyle={styles.listContent}
                 refreshing={loading}
                 onRefresh={fetchPlaylists}
@@ -97,7 +97,7 @@ export default function PlaylistsScreen() {
                         />
                     ) : null
                 }
-                renderItem={({ item }) => (
+                renderItem={({ item }: { item: Playlist }) => (
                     <TouchableOpacity 
                         style={styles.playlistCard}
                         onPress={() => navigation.navigate('PlaylistDetail', { playlist: item })}

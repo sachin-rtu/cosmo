@@ -6,7 +6,7 @@ import {
 import { Image } from 'expo-image'
 import { FlashList } from '@shopify/flash-list'
 import { useRoute, useNavigation } from '@react-navigation/native'
-import { usePlaylistStore, type Playlist } from '../store/playlistStore'
+import { usePlaylistStore, type Playlist, type PlaylistTrack } from '../store/playlistStore'
 import { usePlayerStore, type CosmoTrack } from '../store/playerStore'
 
 export default function PlaylistDetailScreen() {
@@ -95,8 +95,8 @@ export default function PlaylistDetailScreen() {
 
             <FlashList
                 data={tracks}
-                estimatedItemSize={64}
-                keyExtractor={(item) => item.video_id}
+                {...({ estimatedItemSize: 64 } as any)}
+                keyExtractor={(item: PlaylistTrack) => item.video_id}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={
                     <View style={styles.emptyContainer}>
@@ -106,7 +106,7 @@ export default function PlaylistDetailScreen() {
                         </Text>
                     </View>
                 }
-                renderItem={({ item, index }) => (
+                renderItem={({ item, index }: { item: PlaylistTrack; index: number }) => (
                     <TouchableOpacity 
                         style={styles.trackCard}
                         onPress={() => handlePlayTrack(index)}

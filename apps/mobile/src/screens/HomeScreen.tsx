@@ -138,9 +138,9 @@ export default function HomeScreen() {
             </View>
           ) : (
             // @ts-ignore - types are missing estimatedItemSize
-            <FlashList
+            <FlashList<any>
               data={trendingTracks}
-              estimatedItemSize={130}
+              {...({ estimatedItemSize: 130 } as any)}
               keyExtractor={(item) => item.videoId}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -192,9 +192,9 @@ export default function HomeScreen() {
             </View>
           ) : forYouTracks.length > 0 ? (
             // @ts-ignore - types are missing estimatedItemSize
-            <FlashList
+            <FlashList<any>
               data={forYouTracks}
-              estimatedItemSize={130}
+              {...({ estimatedItemSize: 130 } as any)}
               keyExtractor={(item) => item.videoId}
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -237,9 +237,9 @@ export default function HomeScreen() {
           <View style={styles.recentSection}>
             <Text style={styles.recentTitle}>Recently Played</Text>
             {/* @ts-ignore - types are missing estimatedItemSize */}
-            <FlashList
+            <FlashList<any>
               data={recentlyPlayed}
-              estimatedItemSize={120}
+              {...({ estimatedItemSize: 120 } as any)}
               keyExtractor={(item, index) => item.videoId + index}
               horizontal
               showsHorizontalScrollIndicator={false}

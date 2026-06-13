@@ -25,7 +25,7 @@ import Feather from '@expo/vector-icons/Feather'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated'
 import * as Haptics from 'expo-haptics'
-import Equalizer from '../components/Equalizer'
+
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const ARTWORK_SIZE = SCREEN_WIDTH - 64
@@ -331,10 +331,10 @@ export default function NowPlayingScreen() {
                             <ActivityIndicator size="large" color="#1DB954" style={{ marginTop: 40 }} />
                         ) : lyrics?.synced ? (
                             // @ts-ignore - types are missing estimatedItemSize
-                            <FlashList
+                            <FlashList<any>
                                 ref={flashListRef}
                                 data={lyrics.synced}
-                                estimatedItemSize={40}
+                                {...({ estimatedItemSize: 40 } as any)}
                                 contentContainerStyle={{ paddingVertical: ARTWORK_SIZE / 2 }}
                                 showsVerticalScrollIndicator={false}
                                 renderItem={({ item, index }) => {
@@ -604,23 +604,11 @@ export default function NowPlayingScreen() {
                     <Text style={[styles.lyricsBtnText, showLyrics && styles.lyricsBtnTextActive]}>Lyrics</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity 
-                    style={[styles.lyricsBtn, showEQ && styles.lyricsBtnActive]}
-                    onPress={() => {
-                        setShowEQ(!showEQ)
-                        if (showLyrics) setShowLyrics(false)
-                    }}
-                >
-                    <Ionicons name="options-outline" size={18} color={showEQ ? '#000' : '#fff'} style={{ marginRight: 6 }} />
-                    <Text style={[styles.lyricsBtnText, showEQ && styles.lyricsBtnTextActive]}>EQ</Text>
-                </TouchableOpacity>
+
             </View>
             </ScrollView>
 
-            {/* Equalizer Bottom Sheet */}
-            <Animated.View style={eqAnimatedStyle}>
-                <Equalizer />
-            </Animated.View>
+
 
             {/* Settings Modal */}
             <Modal

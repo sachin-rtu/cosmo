@@ -96,9 +96,9 @@ export default function LibraryScreen() {
           </View>
         ) : (
           // @ts-ignore - types are missing estimatedItemSize
-          <FlashList
+          <FlashList<any>
             data={likedTracks}
-            estimatedItemSize={72}
+            {...({ estimatedItemSize: 72 } as any)}
             keyExtractor={(item) => item.video_id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.likedList}

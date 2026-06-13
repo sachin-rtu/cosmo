@@ -5,6 +5,7 @@ import { resolveStreamClientSide } from './innertubeService'
 import api from './api'
 import { Alert } from 'react-native'
 
+// @ts-expect-error - documentDirectory is a valid property but types are missing in this expo-file-system version
 const DOWNLOADS_DIR = `${FileSystem.documentDirectory}downloads/`
 
 async function ensureDirExists() {

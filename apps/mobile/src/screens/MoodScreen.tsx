@@ -106,9 +106,9 @@ export default function MoodScreen() {
                         </TouchableOpacity>
                     </View>
 
-                    <FlashList
+                    <FlashList<any>
                         data={playlist}
-                        estimatedItemSize={76}
+                        {...({ estimatedItemSize: 76 } as any)}
                         keyExtractor={(item, index) => item.videoId + index}
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={styles.playlistList}
