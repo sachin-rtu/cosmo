@@ -22,6 +22,7 @@ import type { RootStackParams } from '../navigation'
 import Feather from '@expo/vector-icons/Feather'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated'
+import * as Haptics from 'expo-haptics'
 import Equalizer from '../components/Equalizer'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -333,9 +334,17 @@ export default function NowPlayingScreen() {
                                     const nextLine = lyrics.synced![index + 1]
                                     const isActive = currentTime >= item.time && (!nextLine || currentTime < nextLine.time)
                                     return (
-                                        <Text style={[styles.lyricLine, isActive && styles.lyricLineActive]}>
-                                            {item.text}
-                                        </Text>
+                                        <TouchableOpacity 
+                                            activeOpacity={0.7}
+                                            onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+                                                TrackPlayer.seekTo(item.time)
+                                            }}
+                                        >
+                                            <Text style={[styles.lyricLine, isActive && styles.lyricLineActive]}>
+                                                {item.text}
+                                            </Text>
+                                        </TouchableOpacity>
                                     )
                                 }}
                             />
@@ -1172,17 +1181,20 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
     },
     lyricLine: {
-        color: '#555',
-        fontSize: 16,
-        fontWeight: '400',
-        textAlign: 'center',
+        color: 'rgba(255, 255, 255, 0.4)',
+        fontSize: 18,
+        fontWeight: '600',
+        textAlign: 'left',
         paddingVertical: 12,
-        paddingHorizontal: 16,
+        paddingHorizontal: 24,
     },
     lyricLineActive: {
         color: '#fff',
-        fontSize: 18,
-        fontWeight: '700',
+        fontSize: 24,
+        fontWeight: '800',
+        textShadowColor: 'rgba(255, 255, 255, 0.3)',
+        textShadowOffset: { width: 0, height: 0 },
+        textShadowRadius: 8,
     },
     plainLyricsText: {
         color: '#ccc',
