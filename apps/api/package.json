@@ -20,7 +20,8 @@
     "fastify": "^4.27.0",
     "play-dl": "^1.9.7",
     "youtube-dl-exec": "^3.1.7",
-    "youtubei.js": "^17.0.1"
+    "youtubei.js": "^17.0.1",
+    "lrclib-api": "*"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

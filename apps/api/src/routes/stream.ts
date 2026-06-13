@@ -29,7 +29,7 @@ export async function streamRoutes(fastify: FastifyInstance) {
             cacheKey,
             () => getStreamUrl(videoId),
             {
-                ttlSeconds: 7200,
+                ttlSeconds: 14400,
                 forceRefresh: shouldForceRefresh,
             }
         )

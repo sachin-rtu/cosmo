@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger'
 import { Innertube, Platform } from 'youtubei.js'
 import youtubedl, { create as createYtdl } from 'youtube-dl-exec'
 import { execSync } from 'child_process'
@@ -23,6 +24,9 @@ async function getInnertube(): Promise<Innertube> {
         innertubePromise = Innertube.create({
             retrieve_player: true,
             generate_session_locally: true
+        }).catch(err => {
+            innertubePromise = null
+            throw err
         })
     }
     return innertubePromise
@@ -139,11 +143,11 @@ async function getPipedInstances(): Promise<string[]> {
         if (urls.length > 0) {
             cachedPipedInstances = urls
             pipedInstancesFetchedAt = Date.now()
-            console.log(`Piped: loaded ${urls.length} instances from registry`)
+            logger.info(`Piped: loaded ${urls.length} instances from registry`)
             return urls
         }
     } catch (err) {
-        console.warn('Piped: failed to fetch instance registry:', (err as Error).message)
+        logger.warn('Piped: failed to fetch instance registry:', (err as Error).message)
     }
 
     return FALLBACK_PIPED_INSTANCES
@@ -181,7 +185,7 @@ async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
             const audioWithUrl = audioStreams.filter((s: any) => s.url)
             if (audioWithUrl.length > 0) {
                 const best = audioWithUrl.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0]
-                console.log(`Piped (${instance}) resolved audio stream for ${videoId}`)
+                logger.info(`Piped (${instance}) resolved audio stream for ${videoId}`)
                 return {
                     type: 'vod',
                     url: best.url,
@@ -196,7 +200,7 @@ async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
                 // Prefer LBRY (Odysee CDN) or lowest quality video (saves bandwidth for audio-only use)
                 const lbry = withAudio.find((s: any) => s.quality === 'LBRY')
                 const pick = lbry || withAudio[withAudio.length - 1]
-                console.log(`Piped (${instance}) resolved video+audio stream for ${videoId} (quality: ${pick.quality})`)
+                logger.info(`Piped (${instance}) resolved video+audio stream for ${videoId} (quality: ${pick.quality})`)
                 return {
                     type: 'vod',
                     url: pick.url,
@@ -207,7 +211,7 @@ async function getStreamUrlWithPiped(videoId: string): Promise<streamResult> {
             throw new Error('No audio or combined streams from Piped')
         } catch (err) {
             lastError = err instanceof Error ? err : new Error(String(err))
-            console.warn(`Piped instance ${instance} failed for ${videoId}:`, lastError.message)
+            logger.warn(`Piped instance ${instance} failed for ${videoId}:`, lastError.message)
         }
     }
 
@@ -254,7 +258,7 @@ async function getStreamUrlWithCobalt(videoId: string): Promise<streamResult> {
         throw new Error('Cobalt failed to return a stream URL: ' + JSON.stringify(data))
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
-        console.warn(`Cobalt API failed for ${videoId}:`, msg)
+        logger.warn(`Cobalt API failed for ${videoId}:`, msg)
         throw new Error(`Cobalt failed: ${msg}`)
     }
 }
@@ -265,44 +269,44 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
         return await getStreamUrlWithYtDlp(videoId)
     } catch (ytdlError) {
         const ytdlMsg = ytdlError instanceof Error ? ytdlError.message : String(ytdlError)
-        console.error('yt-dlp failed for', videoId, ytdlMsg)
+        logger.error('yt-dlp failed for', videoId, ytdlMsg)
     }
 
     // Strategy 2: youtubei.js
     try {
-        console.log('Falling back to youtubei.js for', videoId)
+        logger.info('Falling back to youtubei.js for', videoId)
         return await getStreamUrlWithYti(videoId)
     } catch (ytiError) {
         const ytiMsg = ytiError instanceof Error ? ytiError.message : String(ytiError)
-        console.error('youtubei.js failed for', videoId, ytiMsg)
+        logger.error('youtubei.js failed for', videoId, ytiMsg)
     }
 
     // Strategy 3: Piped API (external IPs, bypasses Railway bot detection)
     try {
-        console.log('Falling back to Piped API for', videoId)
+        logger.info('Falling back to Piped API for', videoId)
         return await getStreamUrlWithPiped(videoId)
     } catch (pipedError) {
         const pipedMsg = pipedError instanceof Error ? pipedError.message : String(pipedError)
-        console.error('Piped API failed for', videoId, pipedMsg)
+        logger.error('Piped API failed for', videoId, pipedMsg)
     }
     
     // Strategy 4: Cobalt API
     try {
-        console.log('Falling back to Cobalt API for', videoId)
+        logger.info('Falling back to Cobalt API for', videoId)
         return await getStreamUrlWithCobalt(videoId)
     } catch (cobaltError) {
         const cobaltMsg = cobaltError instanceof Error ? cobaltError.message : String(cobaltError)
-        console.error('Cobalt API failed for', videoId, cobaltMsg)
+        logger.error('Cobalt API failed for', videoId, cobaltMsg)
     }
 
     // Strategy 5: play-dl (Very reliable for Discord bots, handles bot checks internally)
     try {
-        console.log('Falling back to play-dl for', videoId)
+        logger.info('Falling back to play-dl for', videoId)
         const info = await play.video_info(`https://www.youtube.com/watch?v=${videoId}`)
         const format = info.format.find((f: any) => f.hasAudio && !f.hasVideo) || info.format.find((f: any) => f.hasAudio)
         
         if (format && format.url) {
-            console.log('play-dl resolved stream for', videoId)
+            logger.info('play-dl resolved stream for', videoId)
             return {
                 type: 'vod',
                 url: format.url,
@@ -312,7 +316,7 @@ export async function getStreamUrl(videoId: string): Promise<streamResult> {
         throw new Error('play-dl returned no audio formats')
     } catch (playDlError) {
         const playDlMsg = playDlError instanceof Error ? playDlError.message : String(playDlError)
-        console.error('play-dl failed for', videoId, playDlMsg)
+        logger.error('play-dl failed for', videoId, playDlMsg)
         throw new Error(`All stream strategies failed for ${videoId}`)
     }
 }

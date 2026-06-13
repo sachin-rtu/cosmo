@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger'
 import { Innertube, Platform, YTNodes } from 'youtubei.js'
 
 // Re-use the same eval shim as streamServices
@@ -14,17 +15,20 @@ export interface TrendingTrack {
 }
 
 // Dedicated InnerTube instance scoped to India
-let innertubeIN: Innertube | null = null
+let innertubeINPromise: Promise<Innertube> | null = null
 
 async function getInnertubeIN(): Promise<Innertube> {
-    if (!innertubeIN) {
-        innertubeIN = await Innertube.create({
+    if (!innertubeINPromise) {
+        innertubeINPromise = Innertube.create({
             retrieve_player: false, // we don't need stream deciphering here
             location: 'IN',
             lang: 'en',
+        }).catch(err => {
+            innertubeINPromise = null
+            throw err
         })
     }
-    return innertubeIN
+    return innertubeINPromise
 }
 
 /**
@@ -49,7 +53,7 @@ export async function getTrendingTracks(): Promise<TrendingTrack[]> {
             }
         }
     } catch (err) {
-        console.error('getExplore failed, falling back to search:', err)
+        logger.error('getExplore failed, falling back to search:', err)
     }
 
     // Fallback: search-based trending

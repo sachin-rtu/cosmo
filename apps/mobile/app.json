@@ -26,7 +26,11 @@
       ]
     },
     "plugins": [
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-image"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.sachin.cosmo"
+    }
   }
 }

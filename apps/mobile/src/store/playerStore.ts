@@ -1,7 +1,36 @@
 import { create } from 'zustand'
 import TrackPlayer, { RepeatMode } from '@rntp/player'
+import { createMMKV } from 'react-native-mmkv'
+import { Alert } from 'react-native'
+
+const playerStorage = createMMKV({ id: 'cosmo-player-settings' })
 import api from '../services/api'
 import { recordPlay } from './insightsStore'
+import { resolveStreamClientSide } from '../services/innertubeService'
+import { stopCrossfade } from '../services/crossfadeService'
+
+// Helper: resolve stream URL with client-side first, server fallback
+async function resolveStreamUrl(videoId: string): Promise<{ url: string; expiresAt: number }> {
+    // Strategy 1: Client-side InnerTube (from phone's residential IP — most reliable)
+    try {
+        const result = await resolveStreamClientSide(videoId)
+        console.log(`[Stream] Client-side resolved ${videoId}`)
+        return { url: result.url, expiresAt: result.expiresAt }
+    } catch (clientErr: any) {
+        console.warn(`[Stream] Client-side failed for ${videoId}:`, clientErr.message)
+    }
+
+    // Strategy 2: Server API fallback (Railway — may work via Piped/LBRY cache)
+    try {
+        const response = await api.get(`/stream/${videoId}`)
+        console.log(`[Stream] Server resolved ${videoId}`)
+        return { url: response.data.url, expiresAt: response.data.expiresAt }
+    } catch (serverErr: any) {
+        console.error(`[Stream] Server also failed for ${videoId}:`, serverErr.message)
+    }
+
+    throw new Error(`All stream strategies failed for ${videoId}`)
+}
 
 // Track type 
 export interface CosmoTrack {
@@ -28,6 +57,9 @@ interface PlayerStore {
 
     prefetchedUrls: Record<string, { url: string; expiresAt: number }>
 
+    crossfadeEnabled: boolean
+    crossfadeDuration: number
+
     // Actions 
     playQueue: (tracks: CosmoTrack[], startIndex?: number) => Promise<void>
     addToQueue: (track: CosmoTrack) => Promise<void>
@@ -40,6 +72,9 @@ interface PlayerStore {
     skipToPrev: () => Promise<void>
     resolveAndPlay: (track: CosmoTrack, index: number) => Promise<void>
     prefetchNext: () => Promise<void>
+    
+    setCrossfadeEnabled: (enabled: boolean) => void
+    setCrossfadeDuration: (duration: number) => void
 }
 
 // Helper: build a single RNTP media item
@@ -63,6 +98,18 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     isShuffled: false,
     repeatMode: 'off',
     prefetchedUrls: {},
+
+    crossfadeEnabled: playerStorage.getBoolean('crossfade-enabled') ?? false,
+    crossfadeDuration: playerStorage.getNumber('crossfade-duration') ?? 5,
+
+    setCrossfadeEnabled: (enabled) => {
+        playerStorage.set('crossfade-enabled', enabled)
+        set({ crossfadeEnabled: enabled })
+    },
+    setCrossfadeDuration: (duration) => {
+        playerStorage.set('crossfade-duration', duration)
+        set({ crossfadeDuration: duration })
+    },
 
     toggleFavorite: (videoId) => {
         set(state => ({
@@ -113,7 +160,14 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
     // resolveAndPlay 
     resolveAndPlay: async (track, index) => {
-        const { prefetchedUrls, queue, currentIndex } = get()
+        // Stop any active crossfade interval if user skipped manually
+        await stopCrossfade()
+
+        // Immediately update UI so transitions feel instant
+        set({ currentIndex: index, isPlaying: true })
+        TrackPlayer.pause() // Stop old audio from bleeding while fetching stream
+
+        const { prefetchedUrls, queue } = get()
         const now = Math.floor(Date.now() / 1000)
 
         let streamUrl: string
@@ -124,41 +178,34 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             streamUrl = prefetched.url
         } else {
             try {
-                const response = await api.get(`/stream/${track.videoId}`)
-                streamUrl = response.data.url
+                const resolved = await resolveStreamUrl(track.videoId)
+                streamUrl = resolved.url
 
                 set(state => ({
                     prefetchedUrls: {
                         ...state.prefetchedUrls,
                         [track.videoId]: {
                             url: streamUrl,
-                            expiresAt: response.data.expiresAt,
+                            expiresAt: resolved.expiresAt,
                         }
                     }
                 }))
             } catch (error: any) {
-                console.error("Failed to resolve stream for", track.title, {
-                    status: error?.response?.status,
-                    data: error?.response?.data,
-                    message: error?.message,
-                })
-                return // skip if we can't get a URL
+                console.error(`Failed to resolve stream for ${track.videoId}:`, error.message)
+                Alert.alert("Playback Error", `Could not play ${track.title}.\n\nError: ${error.message}`)
+                return // skip if we can't get a URL anywhere
             }
         }
 
-        // If we are skipping to the very next track, and it was already added to the native queue
-        // by prefetchNext, we can just smoothly skip to it!
-        if (index === currentIndex + 1) {
-            const nativeQueue = await TrackPlayer.getQueue()
-            // Check if the next item is in the native queue
-            if (nativeQueue.length > 1 && nativeQueue[1]?.mediaId === track.videoId) {
-                TrackPlayer.skipToNext()
-                TrackPlayer.play()
-                set({ currentIndex: index, isPlaying: true })
-                recordPlay(track)
-                get().prefetchNext()
-                return
-            }
+        // If the track was already prefetched into native queue, skip to it directly
+        const nativeQueue = await TrackPlayer.getQueue()
+        const nativeIdx = nativeQueue.findIndex(t => t.mediaId === track.videoId)
+        if (nativeIdx >= 0) {
+            await TrackPlayer.skipToIndex(nativeIdx)
+            TrackPlayer.play()
+            recordPlay(track)
+            get().prefetchNext()
+            return
         }
 
         // Otherwise, reset the native queue with just this track
@@ -170,7 +217,6 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             artworkUrl: track.artwork,
         }])
         TrackPlayer.play()
-        set({ currentIndex: index, isPlaying: true })
         recordPlay(track)
 
         // Prefetch next track's URL in background
@@ -181,8 +227,43 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     prefetchNext: async () => {
         const { queue, currentIndex, prefetchedUrls } = get()
         const nextIndex = currentIndex + 1
-        const nextTrack = queue[nextIndex]
-        if (!nextTrack) return
+        let nextTrack = queue[nextIndex]
+
+        if (!nextTrack) {
+            // Reached the end of the user's queue. Fetch an autoplay recommendation!
+            try {
+                const currentTrack = queue[currentIndex]
+                if (!currentTrack) return;
+                
+                // Fetch a recommendation based on current song
+                const response = await api.post('/ai/recommendations', {
+                    topArtists: [currentTrack.artist],
+                    peakHourLabel: '12 PM', 
+                })
+                
+                if (response.data && response.data.length > 0) {
+                    const rec = response.data[0]
+                    nextTrack = {
+                        videoId: rec.videoId,
+                        mediaId: rec.videoId,
+                        title: rec.title,
+                        artist: rec.artist,
+                        artwork: rec.thumbnail ?? '',
+                        duration: rec.durationMs,
+                        url: '',
+                    }
+                    
+                    // Add it to our store's queue
+                    const newQueue = [...queue, nextTrack]
+                    set({ queue: newQueue, originalQueue: newQueue })
+                } else {
+                    return; // No recommendations found
+                }
+            } catch (err) {
+                console.error('Failed to fetch autoplay recommendation:', err)
+                return;
+            }
+        }
 
         const now = Math.floor(Date.now() / 1000)
         let streamUrl = ''
@@ -192,15 +273,15 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             streamUrl = already.url
         } else {
             try {
-                const response = await api.get(`/stream/${nextTrack.videoId}`)
-                streamUrl = response.data.url
+                const resolved = await resolveStreamUrl(nextTrack.videoId)
+                streamUrl = resolved.url
 
                 set(state => ({
                     prefetchedUrls: {
                         ...state.prefetchedUrls,
                         [nextTrack.videoId]: {
                             url: streamUrl,
-                            expiresAt: response.data.expiresAt,
+                            expiresAt: resolved.expiresAt,
                         }
                     }
                 }))
@@ -243,7 +324,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
     skipToPrev: async () => {
         const { queue, currentIndex, repeatMode } = get()
         let prevIndex = currentIndex - 1
-        
+
         if (prevIndex < 0) {
             if (repeatMode === 'all') {
                 prevIndex = queue.length - 1
@@ -270,15 +351,14 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
 
         // Prefetch the stream URL for this track in the background
         try {
-            const response = await api.get(`/stream/${track.videoId}`)
-            const streamUrl = response.data.url
+            const resolved = await resolveStreamUrl(track.videoId)
 
             set(state => ({
                 prefetchedUrls: {
                     ...state.prefetchedUrls,
                     [track.videoId]: {
-                        url: streamUrl,
-                        expiresAt: response.data.expiresAt,
+                        url: resolved.url,
+                        expiresAt: resolved.expiresAt,
                     }
                 }
             }))
@@ -286,7 +366,7 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
             // Update the native queue item with the resolved URL
             const idx = get().queue.findIndex(t => t.videoId === track.videoId)
             if (idx >= 0) {
-                TrackPlayer.replaceMediaItem(idx, buildMediaItem(track, streamUrl))
+                TrackPlayer.replaceMediaItem(idx, buildMediaItem(track, resolved.url))
             }
         } catch {
             // Silent fail — URL will be resolved when the track plays

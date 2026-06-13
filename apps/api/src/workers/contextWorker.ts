@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger'
 import { Worker } from 'bullmq'
 import { Redis } from '@upstash/redis'
 import { generateContextCard } from '../services/geminiService'
@@ -12,7 +13,7 @@ const upstash = new Redis({
 export function startContextWorker() {
     const redisUrl = new URL(process.env.REDIS_WORKER_URL!)
 
-    console.log(`[contextWorker] Connecting to Redis at ${redisUrl.hostname}:${redisUrl.port}`)
+    logger.info(`[contextWorker] Connecting to Redis at ${redisUrl.hostname}:${redisUrl.port}`)
 
     const worker = new Worker(
         'cosmo-jobs',
@@ -23,14 +24,14 @@ export function startContextWorker() {
 
             const { videoId, title, artist } = job.data as ContextJobData
 
-            console.log(`[contextWorker] Processing context for: ${title} by ${artist}`)
+            logger.info(`[contextWorker] Processing context for: ${title} by ${artist}`)
 
             const contextCard = await generateContextCard(title, artist)
 
             const cacheKey = `context:${videoId}`
             await upstash.set(cacheKey, contextCard, { ex: 604800 })
 
-            console.log(`[contextWorker] ✅ Completed — Context card cached for videoId: ${videoId}`)
+            logger.info(`[contextWorker] ✅ Completed — Context card cached for videoId: ${videoId}`)
 
             return { success: true, videoId }
         },
@@ -47,30 +48,30 @@ export function startContextWorker() {
     )
 
     worker.on('ready', () => {
-        console.log('[contextWorker] Worker is READY and listening for jobs')
+        logger.info('[contextWorker] Worker is READY and listening for jobs')
     })
 
     worker.on('active', (job) => {
-        console.log(`[contextWorker] Job ${job.id} is now active`)
+        logger.info(`[contextWorker] Job ${job.id} is now active`)
     })
 
     worker.on('completed', (job) => {
-        console.log(`[contextWorker] Job ${job.id} completed`)
+        logger.info(`[contextWorker] Job ${job.id} completed`)
     })
 
     worker.on('failed', (job, err) => {
-        console.log(`[contextWorker] Job ${job?.id} failed:`, err.message)
+        logger.info(`[contextWorker] Job ${job?.id} failed:`, err.message)
     })
 
     worker.on('error', (err) => {
-        console.error(`[contextWorker] Worker error:`, err.message)
+        logger.error(`[contextWorker] Worker error:`, err.message)
     })
 
     // Attempt to confirm connection
     worker.waitUntilReady().then(() => {
-        console.log('[contextWorker] Redis connection confirmed — worker is online')
+        logger.info('[contextWorker] Redis connection confirmed — worker is online')
     }).catch((err) => {
-        console.error('[contextWorker] Failed to connect to Redis:', err.message)
+        logger.error('[contextWorker] Failed to connect to Redis:', err.message)
     })
 
     return worker

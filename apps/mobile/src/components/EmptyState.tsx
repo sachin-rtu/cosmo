@@ -1,5 +1,6 @@
 import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import Ionicons from '@expo/vector-icons/Ionicons'
 
 interface EmptyStateAction {
     label: string
@@ -21,7 +22,7 @@ interface EmptyStateProps {
 export default function EmptyState({ icon, title, message, action }: EmptyStateProps) {
     return (
         <View style={styles.container}>
-            <Text style={styles.icon}>{icon}</Text>
+            <Ionicons name={icon as any} size={48} color="#666" style={{ marginBottom: 16 }} />
             <Text style={styles.title}>{title}</Text>
             <Text style={styles.message}>{message}</Text>
             {action && (

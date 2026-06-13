@@ -109,7 +109,16 @@ export default function MoodScreen() {
                         showsVerticalScrollIndicator={false}
                         contentContainerStyle={styles.playlistList}
                         renderItem={({ item, index }) => (
-                            <View style={styles.trackRow}>
+                            <TouchableOpacity 
+                                style={styles.trackRow}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                    if (playlist) {
+                                        playQueue(playlist, index)
+                                        navigation.navigate('NowPlaying')
+                                    }
+                                }}
+                            >
                                 {item.artwork ? (
                                     <Image source={{ uri: item.artwork }} style={styles.trackArtwork} />
                                 ) : (
@@ -119,7 +128,7 @@ export default function MoodScreen() {
                                     <Text style={styles.trackTitle} numberOfLines={1}>{item.title}</Text>
                                     <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         )}
                     />
                     

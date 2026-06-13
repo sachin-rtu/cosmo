@@ -27,6 +27,7 @@ import { trendingRoutes } from './routes/trending';
 import { recommendationRoutes } from './routes/recommendations';
 import { likesRoutes } from './routes/likes';
 import { playlistsRoutes } from './routes/playlists';
+import { lyricsRoutes } from './routes/lyrics';
 import queuePlugin from './plugins/queue'
 import contextRoutes from './routes/context'
 import { startContextWorker } from './workers/contextWorker'
@@ -61,6 +62,7 @@ app.register(trendingRoutes, { prefix: '/trending' });
 app.register(recommendationRoutes, { prefix: '/ai' });
 app.register(likesRoutes, { prefix: '/likes' });
 app.register(playlistsRoutes, { prefix: '/playlists' });
+app.register(lyricsRoutes, { prefix: '/lyrics' });
 
 app.register(contextRoutes, { prefix: '/context' });
 

@@ -2,6 +2,8 @@ import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native'
 import type { FallbackProps } from 'react-error-boundary'
 
+import Ionicons from '@expo/vector-icons/Ionicons'
+
 /**
  * Fallback UI rendered when the global ErrorBoundary catches an unhandled
  * React error. Shows a cosmic-themed crash screen with error details and
@@ -11,7 +13,7 @@ export default function GlobalErrorFallback({ error, resetErrorBoundary }: Fallb
     return (
         <View style={styles.container}>
             {/* Cosmic icon */}
-            <Text style={styles.emoji}>💫</Text>
+            <Ionicons name="planet" size={64} color="#1DB954" style={{ marginBottom: 16 }} />
 
             <Text style={styles.title}>Something went wrong</Text>
             <Text style={styles.message}>

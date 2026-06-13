@@ -48,7 +48,7 @@ export function getInsights() {
     const existing = storage.getString('play-events')
     const events: PlayEvent[] = existing ? JSON.parse(existing) : []
 
-    if (events.length == 0) return null
+    if (events.length === 0) return null
 
     // Top artists
     const artistCounts: Record<string, number> = {}
@@ -92,7 +92,7 @@ export function getInsights() {
         
         if (diffDays <= 1) {
             streakDays = 1
-            let expectedDate = latestPlayDate
+            let expectedDate = new Date(latestPlayDate)
             
             for (let i = 1; i < sortedDays.length; i++) {
                 expectedDate.setDate(expectedDate.getDate() - 1)

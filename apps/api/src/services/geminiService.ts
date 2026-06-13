@@ -1,3 +1,4 @@
+import { logger } from '../utils/logger'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
@@ -47,7 +48,7 @@ export async function generateContextCard(title: string, artist: string): Promis
         const parsed = JSON.parse(text) as ContextCard
         return parsed
     } catch (err) {
-        console.error(`[gemini] Failed to generate context for "${title}" by "${artist}":`, (err as Error).message)
+        logger.error(`[gemini] Failed to generate context for "${title}" by "${artist}":`, (err as Error).message)
         throw err
     }
 }
@@ -97,7 +98,7 @@ export async function generateSearchQueries(
 
         return parsed.slice(0, 5)
     } catch (err) {
-        console.error('[gemini] Failed to generate search queries:', (err as Error).message)
+        logger.error('[gemini] Failed to generate search queries:', (err as Error).message)
         return FALLBACK_QUERIES
     }
 }
@@ -130,7 +131,7 @@ export async function generateMoodQueries(mood: string): Promise<string[]> {
 
         return parsed.slice(0, 3)
     } catch (err) {
-        console.error('[gemini] Failed to generate mood queries:', (err as Error).message)
+        logger.error('[gemini] Failed to generate mood queries:', (err as Error).message)
         return ['trending music', 'chill vibes', 'popular hits']
     }
 }
@@ -169,7 +170,7 @@ Return ONLY a JSON object: { "transcript": "what they said", "query": "the searc
             query: parsed.query || parsed.transcript || '',
         }
     } catch (err) {
-        console.error('[gemini] Failed to transcribe audio:', (err as Error).message)
+        logger.error('[gemini] Failed to transcribe audio:', (err as Error).message)
         throw new Error('Failed to process voice search')
     }
 }

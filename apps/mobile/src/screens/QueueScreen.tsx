@@ -7,6 +7,7 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable'
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist'
+import { BlurView } from 'expo-blur'
 import { usePlayerStore, type CosmoTrack } from '../store/playerStore'
 import type { RootStackParams } from '../navigation'
 
@@ -108,7 +109,7 @@ export default function QueueScreen() {
             <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
 
             {/* Header */}
-            <View style={styles.header}>
+            <BlurView intensity={70} tint="dark" style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
                     style={styles.backBtn}
@@ -120,7 +121,7 @@ export default function QueueScreen() {
                 <Text style={styles.trackCount}>
                     {upcomingTracks.length} track{upcomingTracks.length !== 1 ? 's' : ''}
                 </Text>
-            </View>
+            </BlurView>
 
             {/* Now Playing */}
             {currentTrack && (

@@ -1,9 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import {
-    View, Text, StyleSheet, Image, TouchableOpacity,
+    View, Text, StyleSheet, TouchableOpacity,
     SafeAreaView, StatusBar, ActivityIndicator,
     Dimensions, Platform, ScrollView, Modal, Pressable, FlatList, Alert, Share
 } from 'react-native'
+import { Image } from 'expo-image'
+import { BlurView } from 'expo-blur'
+import { FlashList } from '@shopify/flash-list'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import TrackPlayer, {
@@ -16,6 +19,10 @@ import { usePlaylistStore } from '../store/playlistStore'
 import { useAuthStore } from '../store/authStore'
 import api from '../services/api'
 import type { RootStackParams } from '../navigation'
+import Feather from '@expo/vector-icons/Feather'
+import Ionicons from '@expo/vector-icons/Ionicons'
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated'
+import Equalizer from '../components/Equalizer'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 const ARTWORK_SIZE = SCREEN_WIDTH - 64
@@ -50,12 +57,38 @@ export default function NowPlayingScreen() {
     const [contextCard, setContextCard] = useState<ContextCard | null>(null)
     const [contextLoading, setContextLoading] = useState(false)
 
+    const [settingsModalVisible, setSettingsModalVisible] = useState(false)
     const [timerModalVisible, setTimerModalVisible] = useState(false)
     const [sleepTimeRemaining, setSleepTimeRemaining] = useState<number | null>(null)
 
     const [playlistModalVisible, setPlaylistModalVisible] = useState(false)
     const { session } = useAuthStore()
     const { playlists, addTrack, createPlaylist, fetchPlaylists } = usePlaylistStore()
+
+    // Lyrics State
+    const [lyrics, setLyrics] = useState<{ synced: { time: number; text: string }[] | null; plain: string | null } | null>(null)
+    const [lyricsLoading, setLyricsLoading] = useState(false)
+    const [showLyrics, setShowLyrics] = useState(false)
+    const flashListRef = React.useRef<any>(null)
+
+    // EQ State
+    const [showEQ, setShowEQ] = useState(false)
+    const eqSlideY = useSharedValue(SCREEN_WIDTH) // start hidden off screen below context card
+
+    const eqAnimatedStyle = useAnimatedStyle(() => {
+        return {
+            transform: [{ translateY: eqSlideY.value }],
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 10,
+        }
+    })
+
+    useEffect(() => {
+        eqSlideY.value = withSpring(showEQ ? 0 : 400, { damping: 20, stiffness: 100 })
+    }, [showEQ])
 
     // Fetch playlists on mount if logged in
     useEffect(() => {
@@ -106,6 +139,45 @@ export default function NowPlayingScreen() {
         if (m > 0) return `${m}m`
         return `${s}s`
     }
+
+    // ── Fetch Lyrics when track changes ───────────────────────────────────────
+    useEffect(() => {
+        if (!currentTrack) return
+        setLyrics(null)
+        setLyricsLoading(true)
+
+        let cancelled = false
+        const fetchLyrics = async () => {
+            try {
+                const response = await api.get(`/lyrics`, {
+                    params: { title: currentTrack.title, artist: currentTrack.artist }
+                })
+                if (!cancelled) {
+                    setLyrics(response.data)
+                }
+            } catch (err) {
+                console.error('Failed to fetch lyrics', err)
+            } finally {
+                if (!cancelled) setLyricsLoading(false)
+            }
+        }
+        fetchLyrics()
+
+        return () => { cancelled = true }
+    }, [currentTrack?.videoId])
+
+    // Auto-scroll lyrics
+    useEffect(() => {
+        if (!showLyrics || !lyrics?.synced || !flashListRef.current) return
+        const currentTime = progress.position
+        const activeIndex = lyrics.synced.findIndex((line, index) => {
+            const nextLine = lyrics.synced![index + 1]
+            return currentTime >= line.time && (!nextLine || currentTime < nextLine.time)
+        })
+        if (activeIndex !== -1) {
+            flashListRef.current.scrollToIndex({ index: activeIndex, animated: true, viewPosition: 0.5 })
+        }
+    }, [progress.position, showLyrics, lyrics?.synced])
 
     // ── Fetch context card when track changes ─────────────────────────────────
     useEffect(() => {
@@ -184,8 +256,9 @@ export default function NowPlayingScreen() {
 
     if (!currentTrack) {
         return (
-            <SafeAreaView style={styles.container}>
-                <Text style={styles.emptyText}>Nothing playing</Text>
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <StatusBar barStyle="light-content" backgroundColor="#000" />
+                <Text style={{ color: '#888', fontSize: 16 }}>Nothing playing</Text>
             </SafeAreaView>
         )
     }
@@ -206,7 +279,7 @@ export default function NowPlayingScreen() {
                     style={styles.backBtn}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={styles.backArrow}>↓</Text>
+                    <Feather name="chevron-down" size={22} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Now Playing</Text>
                 
@@ -224,14 +297,51 @@ export default function NowPlayingScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Artwork */}
+            {/* Artwork OR Lyrics */}
             <View style={styles.artworkWrapper}>
-                <Image
-                    source={{ uri: currentTrack.artwork }}
-                    style={styles.artwork}
-                />
-                {/* Subtle green glow effect */}
-                <View style={styles.artworkGlow} />
+                {showLyrics ? (
+                    <View style={styles.lyricsContainer}>
+                        {lyricsLoading ? (
+                            <ActivityIndicator size="large" color="#1DB954" style={{ marginTop: 40 }} />
+                        ) : lyrics?.synced ? (
+                            // @ts-ignore - types are missing estimatedItemSize
+                            <FlashList
+                                ref={flashListRef}
+                                data={lyrics.synced}
+                                estimatedItemSize={40}
+                                contentContainerStyle={{ paddingVertical: ARTWORK_SIZE / 2 }}
+                                showsVerticalScrollIndicator={false}
+                                renderItem={({ item, index }) => {
+                                    const currentTime = progress.position
+                                    const nextLine = lyrics.synced![index + 1]
+                                    const isActive = currentTime >= item.time && (!nextLine || currentTime < nextLine.time)
+                                    return (
+                                        <Text style={[styles.lyricLine, isActive && styles.lyricLineActive]}>
+                                            {item.text}
+                                        </Text>
+                                    )
+                                }}
+                            />
+                        ) : lyrics?.plain ? (
+                            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20 }}>
+                                <Text style={styles.plainLyricsText}>{lyrics.plain}</Text>
+                            </ScrollView>
+                        ) : (
+                            <View style={styles.noLyricsContainer}>
+                                <Text style={styles.noLyricsText}>No lyrics found</Text>
+                            </View>
+                        )}
+                    </View>
+                ) : (
+                    currentTrack.artwork ? (
+                        <Image
+                            source={{ uri: currentTrack.artwork }}
+                            style={styles.artwork}
+                        />
+                    ) : (
+                        <View style={[styles.artwork, { backgroundColor: '#222' }]} />
+                    )
+                )}
             </View>
 
             {/* Track info + Heart */}
@@ -250,7 +360,7 @@ export default function NowPlayingScreen() {
                         onPress={handleShare}
                         hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     >
-                        <Text style={styles.shareIcon}>📤</Text>
+                        <Ionicons name="share-outline" size={24} color="#fff" />
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.heartBtn}
@@ -318,10 +428,10 @@ export default function NowPlayingScreen() {
             <View style={styles.controls}>
                 <TouchableOpacity
                     onPress={toggleShuffle}
-                    style={styles.controlBtnSecondary}
+                    style={[styles.controlBtnSecondary, isShuffled && styles.controlBtnSecondaryActive]}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={[styles.controlIconSecondary, isShuffled && styles.activeIcon]}>🔀</Text>
+                    <Ionicons name="shuffle" size={20} color={isShuffled ? '#1DB954' : '#666'} style={{ marginLeft: 2 }} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -329,7 +439,7 @@ export default function NowPlayingScreen() {
                     style={styles.controlBtn}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={styles.controlIcon}>⏮</Text>
+                    <Ionicons name="play-skip-back" size={28} color="#ccc" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -340,7 +450,7 @@ export default function NowPlayingScreen() {
                     }}
                     style={styles.playBtn}
                 >
-                    <Text style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</Text>
+                    <Ionicons name={isPlaying ? 'pause' : 'play'} size={28} color="#000" style={!isPlaying ? { marginLeft: 3 } : undefined} />
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -348,22 +458,21 @@ export default function NowPlayingScreen() {
                     style={styles.controlBtn}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={styles.controlIcon}>⏭</Text>
+                    <Ionicons name="play-skip-forward" size={28} color="#ccc" />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                     onPress={toggleRepeat}
-                    style={styles.controlBtnSecondary}
+                    style={[styles.controlBtnSecondary, repeatMode !== 'off' && styles.controlBtnSecondaryActive]}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={[styles.controlIconSecondary, repeatMode !== 'off' && styles.activeIcon]}>
-                        {repeatMode === 'one' ? '🔂' : '🔁'}
-                    </Text>
+                    <Ionicons name="repeat" size={20} color={repeatMode !== 'off' ? '#1DB954' : '#666'} />
+                    {repeatMode === 'one' && <View style={styles.repeatOneDot} />}
                 </TouchableOpacity>
             </View>
 
             {/* Context card */}
-            <View style={styles.contextCard}>
+            <BlurView intensity={60} tint="dark" style={styles.contextCard}>
                 {contextLoading && !contextCard && (
                     <View style={styles.contextLoading}>
                         <ActivityIndicator size="small" color="#1DB954" />
@@ -414,18 +523,134 @@ export default function NowPlayingScreen() {
                         ) : null}
                     </>
                 )}
-            </View>
+            </BlurView>
 
-            {/* Show Queue Button */}
-            <TouchableOpacity 
-                style={styles.queueBtn}
-                onPress={() => navigation.navigate('Queue')}
-            >
-                <Text style={styles.queueBtnIcon}>📋</Text>
-                <Text style={styles.queueBtnText}>Up Next</Text>
-                <Text style={styles.queueBtnChevron}>›</Text>
-            </TouchableOpacity>
+            {/* Show Queue, Lyrics & EQ Buttons */}
+            <View style={styles.actionRow}>
+                <TouchableOpacity 
+                    style={styles.queueBtn}
+                    onPress={() => navigation.navigate('Queue')}
+                >
+                    <Text style={styles.queueBtnIcon}>📋</Text>
+                    <Text style={styles.queueBtnText}>Up Next</Text>
+                    <Text style={styles.queueBtnChevron}>›</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.lyricsBtn, showLyrics && styles.lyricsBtnActive]}
+                    onPress={() => {
+                        setShowLyrics(!showLyrics)
+                        if (showEQ) setShowEQ(false)
+                    }}
+                >
+                    <Ionicons name="mic-outline" size={18} color={showLyrics ? '#000' : '#fff'} style={{ marginRight: 6 }} />
+                    <Text style={[styles.lyricsBtnText, showLyrics && styles.lyricsBtnTextActive]}>Lyrics</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                    style={[styles.lyricsBtn, showEQ && styles.lyricsBtnActive]}
+                    onPress={() => {
+                        setShowEQ(!showEQ)
+                        if (showLyrics) setShowLyrics(false)
+                    }}
+                >
+                    <Ionicons name="options-outline" size={18} color={showEQ ? '#000' : '#fff'} style={{ marginRight: 6 }} />
+                    <Text style={[styles.lyricsBtnText, showEQ && styles.lyricsBtnTextActive]}>EQ</Text>
+                </TouchableOpacity>
+            </View>
             </ScrollView>
+
+            {/* Equalizer Bottom Sheet */}
+            <Animated.View style={eqAnimatedStyle}>
+                <Equalizer />
+            </Animated.View>
+
+            {/* Settings Modal */}
+            <Modal
+                visible={settingsModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setSettingsModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <Pressable style={styles.modalBackdrop} onPress={() => setSettingsModalVisible(false)} />
+                    <BlurView intensity={70} tint="dark" style={styles.modalContent}>
+                        <View style={styles.modalHandle} />
+                        <Text style={styles.modalTitle}>Playback Settings</Text>
+
+                        {/* Sleep Timer Option */}
+                        <TouchableOpacity 
+                            style={styles.settingsRow} 
+                            onPress={() => {
+                                setSettingsModalVisible(false)
+                                setTimerModalVisible(true)
+                            }}
+                        >
+                            <Feather name="moon" size={24} color="#fff" style={styles.settingsIcon} />
+                            <View style={styles.settingsTextContainer}>
+                                <Text style={styles.settingsRowTitle}>Sleep Timer</Text>
+                                <Text style={styles.settingsRowSubtitle}>
+                                    {sleepTimeRemaining ? `Ends in ${formatSleepTime(sleepTimeRemaining)}` : 'Off'}
+                                </Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#666" />
+                        </TouchableOpacity>
+
+                        {/* Crossfade Option */}
+                        <View style={styles.settingsRow}>
+                            <Feather name="git-merge" size={24} color="#fff" style={styles.settingsIcon} />
+                            <View style={styles.settingsTextContainer}>
+                                <Text style={styles.settingsRowTitle}>Crossfade</Text>
+                                <Text style={styles.settingsRowSubtitle}>
+                                    {usePlayerStore.getState().crossfadeEnabled 
+                                        ? `${usePlayerStore.getState().crossfadeDuration}s` 
+                                        : 'Off'}
+                                </Text>
+                            </View>
+                            <TouchableOpacity 
+                                style={[styles.toggleBtn, usePlayerStore.getState().crossfadeEnabled && styles.toggleBtnActive]}
+                                onPress={() => {
+                                    usePlayerStore.getState().setCrossfadeEnabled(!usePlayerStore.getState().crossfadeEnabled)
+                                }}
+                            >
+                                <View style={[styles.toggleKnob, usePlayerStore.getState().crossfadeEnabled && styles.toggleKnobActive]} />
+                            </TouchableOpacity>
+                        </View>
+                        
+                        {usePlayerStore.getState().crossfadeEnabled && (
+                            <View style={styles.sliderContainer}>
+                                <Text style={styles.sliderLabel}>1s</Text>
+                                <View style={styles.sliderTrackWrapper}>
+                                    <View style={styles.sliderBg} />
+                                    <View style={[styles.sliderFill, { width: `${(usePlayerStore.getState().crossfadeDuration / 12) * 100}%` }]} />
+                                    {/* Tap zones for adjusting crossfade */}
+                                    <View style={styles.sliderControls}>
+                                        <TouchableOpacity 
+                                            style={styles.sliderControlHalf} 
+                                            onPress={() => {
+                                                const v = usePlayerStore.getState().crossfadeDuration
+                                                if (v > 1) usePlayerStore.getState().setCrossfadeDuration(v - 1)
+                                            }} 
+                                        />
+                                        <TouchableOpacity 
+                                            style={styles.sliderControlHalf} 
+                                            onPress={() => {
+                                                const v = usePlayerStore.getState().crossfadeDuration
+                                                if (v < 12) usePlayerStore.getState().setCrossfadeDuration(v + 1)
+                                            }} 
+                                        />
+                                    </View>
+                                </View>
+                                <Text style={styles.sliderLabel}>12s</Text>
+                            </View>
+                        )}
+
+                        <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setSettingsModalVisible(false)}>
+                            <Text style={styles.modalCancelText}>Close</Text>
+                        </TouchableOpacity>
+                    </BlurView>
+                </View>
+            </Modal>
 
             {/* Sleep Timer Modal */}
             <Modal
@@ -436,7 +661,7 @@ export default function NowPlayingScreen() {
             >
                 <View style={styles.modalOverlay}>
                     <Pressable style={styles.modalBackdrop} onPress={() => setTimerModalVisible(false)} />
-                    <View style={styles.modalContent}>
+                    <BlurView intensity={70} tint="dark" style={styles.modalContent}>
                         <View style={styles.modalHandle} />
                         <Text style={styles.modalTitle}>Sleep Timer</Text>
                         <Text style={styles.modalSubtitle}>Stop audio after</Text>
@@ -461,7 +686,7 @@ export default function NowPlayingScreen() {
                         <TouchableOpacity style={styles.modalCancelBtn} onPress={() => setTimerModalVisible(false)}>
                             <Text style={styles.modalCancelText}>Cancel</Text>
                         </TouchableOpacity>
-                    </View>
+                    </BlurView>
                 </View>
             </Modal>
 
@@ -476,7 +701,7 @@ export default function NowPlayingScreen() {
                     style={styles.modalOverlay}
                     onPress={() => setPlaylistModalVisible(false)}
                 >
-                    <Pressable style={styles.modalContent}>
+                    <BlurView intensity={70} tint="dark" style={styles.modalContent}>
                         <View style={styles.modalHeader}>
                             <Text style={styles.modalTitle}>Add to Playlist</Text>
                             <TouchableOpacity onPress={() => setPlaylistModalVisible(false)}>
@@ -545,7 +770,7 @@ export default function NowPlayingScreen() {
                                 </TouchableOpacity>
                             )}
                         />
-                    </Pressable>
+                    </BlurView>
                 </Pressable>
             </Modal>
 
@@ -578,10 +803,6 @@ const styles = StyleSheet.create({
         height: 40,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    backArrow: {
-        color: '#fff',
-        fontSize: 22,
     },
     headerTitle: {
         color: '#fff',
@@ -663,14 +884,21 @@ const styles = StyleSheet.create({
     actionBtns: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 16,
+        gap: 12,
     },
     heartBtn: {
         padding: 4,
     },
-    shareIcon: {
-        fontSize: 22,
-        color: '#fff',
+    shareBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: '#1a1a1a',
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 0,
     },
     heartIcon: {
         fontSize: 28,
@@ -728,19 +956,30 @@ const styles = StyleSheet.create({
     controlBtn: {
         padding: 8,
     },
-    controlIcon: {
-        fontSize: 28,
-        color: '#ccc',
-    },
     controlBtnSecondary: {
-        padding: 8,
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#1a1a1a',
+        borderWidth: 1,
+        borderColor: '#2a2a2a',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    controlIconSecondary: {
-        fontSize: 22,
-        color: '#666',
+    controlBtnSecondaryActive: {
+        backgroundColor: '#0d2618',
+        borderColor: '#1DB95440',
     },
-    activeIcon: {
-        color: '#1DB954',
+    repeatOneDot: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#1DB954',
+        borderWidth: 1,
+        borderColor: '#0d2618',
     },
     playBtn: {
         width: 64,
@@ -755,19 +994,15 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.4,
         shadowRadius: 12,
     },
-    playIcon: {
-        fontSize: 26,
-        color: '#000',
-    },
 
     // ── Context card ──────────────────────────────────────────────────────────
     contextCard: {
-        backgroundColor: '#111',
-        borderRadius: 16,
-        padding: 16,
+        marginTop: 32,
+        borderRadius: 24,
+        padding: 20,
         borderWidth: 1,
-        borderColor: '#1a1a1a',
-        minHeight: 80,
+        borderColor: '#333',
+        overflow: 'hidden', // Ensure blur respects radius
     },
     contextLoading: {
         flexDirection: 'row',
@@ -862,20 +1097,85 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         borderWidth: 1,
         borderColor: '#222',
+        flex: 1,
     },
     queueBtnIcon: {
         fontSize: 20,
         marginRight: 12,
     },
     queueBtnText: {
-        color: '#ddd',
-        fontSize: 15,
+        color: '#fff',
+        fontSize: 14,
         fontWeight: '600',
         flex: 1,
     },
     queueBtnChevron: {
-        color: '#555',
+        color: '#666',
         fontSize: 20,
+    },
+    actionRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginTop: 32,
+    },
+    lyricsBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        backgroundColor: '#161616',
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#333',
+    },
+    lyricsBtnActive: {
+        backgroundColor: '#fff',
+        borderColor: '#fff',
+    },
+    lyricsBtnText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    lyricsBtnTextActive: {
+        color: '#000',
+    },
+    lyricsContainer: {
+        width: ARTWORK_SIZE,
+        height: ARTWORK_SIZE,
+        backgroundColor: '#111',
+        borderRadius: 16,
+        overflow: 'hidden',
+    },
+    lyricLine: {
+        color: '#555',
+        fontSize: 16,
+        fontWeight: '400',
+        textAlign: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+    },
+    lyricLineActive: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    plainLyricsText: {
+        color: '#ccc',
+        fontSize: 16,
+        lineHeight: 24,
+        textAlign: 'center',
+    },
+    noLyricsContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    noLyricsText: {
+        color: '#666',
+        fontSize: 16,
     },
 
     // ── Modal ─────────────────────────────────────────────────────────────────
@@ -888,11 +1188,11 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0,0,0,0.6)',
     },
     modalContent: {
-        backgroundColor: '#111',
         borderTopLeftRadius: 24,
         borderTopRightRadius: 24,
         padding: 24,
         paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+        overflow: 'hidden',
     },
     modalHandle: {
         width: 40,
@@ -992,5 +1292,88 @@ const styles = StyleSheet.create({
         fontSize: 14,
         textAlign: 'center',
         marginTop: 20,
+    },
+    // Settings Modal
+    settingsRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#222',
+    },
+    settingsIcon: {
+        marginRight: 16,
+    },
+    settingsTextContainer: {
+        flex: 1,
+    },
+    settingsRowTitle: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: '600',
+        marginBottom: 4,
+    },
+    settingsRowSubtitle: {
+        color: '#888',
+        fontSize: 14,
+    },
+    toggleBtn: {
+        width: 50,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: '#333',
+        justifyContent: 'center',
+        padding: 2,
+    },
+    toggleBtnActive: {
+        backgroundColor: '#1DB954',
+    },
+    toggleKnob: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        backgroundColor: '#fff',
+    },
+    toggleKnobActive: {
+        transform: [{ translateX: 22 }],
+    },
+    sliderContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 16,
+        marginBottom: 8,
+        paddingHorizontal: 8,
+    },
+    sliderLabel: {
+        color: '#888',
+        fontSize: 12,
+        width: 30,
+        textAlign: 'center',
+    },
+    sliderTrackWrapper: {
+        flex: 1,
+        height: 30,
+        justifyContent: 'center',
+        marginHorizontal: 12,
+    },
+    sliderBg: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        height: 4,
+        backgroundColor: '#333',
+        borderRadius: 2,
+    },
+    sliderFill: {
+        height: 4,
+        backgroundColor: '#1DB954',
+        borderRadius: 2,
+    },
+    sliderControls: {
+        ...StyleSheet.absoluteFillObject,
+        flexDirection: 'row',
+    },
+    sliderControlHalf: {
+        flex: 1,
     }
 })

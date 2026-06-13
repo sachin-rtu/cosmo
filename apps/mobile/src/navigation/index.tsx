@@ -1,7 +1,13 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import { View, ActivityIndicator, StyleSheet } from 'react-native'
+import Feather from '@expo/vector-icons/Feather'
+
 import HomeScreen from '../screens/HomeScreen'
+import SearchScreen from '../screens/SearchScreen'
+import LibraryScreen from '../screens/LibraryScreen'
 import NowPlayingScreen from '../screens/NowPlayingScreen'
 import QueueScreen from '../screens/QueueScreen'
 import MoodScreen from '../screens/MoodScreen'
@@ -11,18 +17,22 @@ import SignupScreen from '../screens/SignupScreen'
 import PlaylistsScreen from '../screens/PlaylistsScreen'
 import PlaylistDetailScreen from '../screens/PlaylistDetailScreen'
 import OnboardingScreen from '../screens/OnboardingScreen'
+import MiniPlayer from '../components/MiniPlayer'
+
 import { useAuthStore } from '../store/authStore'
 import { useOnboardingStore } from '../store/onboardingStore'
-import { useEffect } from 'react'
-import { View, ActivityIndicator, StyleSheet } from 'react-native'
 
 // ─── Route definitions ────────────────────────────────────────────────────────
-// This is a TypeScript map of every screen name → what params it accepts.
-// If you navigate to a screen with wrong params, TypeScript catches it.
+export type TabStackParams = {
+    HomeTab: undefined
+    SearchTab: undefined
+    LibraryTab: undefined
+}
+
 export type RootStackParams = {
-    Home: undefined          // no params needed
-    NowPlaying: undefined          // no params — reads from Zustand store
-    Queue: undefined               // no params — reads from Zustand store
+    Tabs: undefined
+    NowPlaying: undefined
+    Queue: undefined
     Mood: undefined
     Insights: undefined
     Playlists: undefined
@@ -33,6 +43,44 @@ export type RootStackParams = {
 }
 
 const Stack = createNativeStackNavigator<RootStackParams>()
+const Tab = createBottomTabNavigator<TabStackParams>()
+
+function TabNavigator() {
+    return (
+        <>
+            <Tab.Navigator
+                screenOptions={({ route }) => ({
+                    headerShown: false,
+                    tabBarIcon: ({ color, size }) => {
+                        let iconName: any = 'home'
+                        if (route.name === 'HomeTab') iconName = 'home'
+                        else if (route.name === 'SearchTab') iconName = 'search'
+                        else if (route.name === 'LibraryTab') iconName = 'book'
+                        return <Feather name={iconName} size={24} color={color} />
+                    },
+                    tabBarActiveTintColor: '#fff',
+                    tabBarInactiveTintColor: '#666',
+                    tabBarStyle: {
+                        backgroundColor: '#0a0a0a',
+                        borderTopWidth: 0,
+                        elevation: 0,
+                        height: 60,
+                        paddingBottom: 8,
+                        paddingTop: 8,
+                    },
+                    tabBarShowLabel: false,
+                })}
+            >
+                <Tab.Screen name="HomeTab" component={HomeScreen} />
+                <Tab.Screen name="SearchTab" component={SearchScreen} />
+                <Tab.Screen name="LibraryTab" component={LibraryScreen} />
+            </Tab.Navigator>
+            
+            {/* Global MiniPlayer floats over all tabs */}
+            <MiniPlayer />
+        </>
+    )
+}
 
 export default function Navigation() {
     const { session, isGuest, initialized, initialize } = useAuthStore()
@@ -56,7 +104,7 @@ export default function Navigation() {
         <NavigationContainer>
             <Stack.Navigator
                 screenOptions={{
-                    headerShown: false,  // we build our own headers
+                    headerShown: false,
                     contentStyle: { backgroundColor: '#0a0a0a' },
                     animation: 'slide_from_bottom', // NowPlaying slides up
                 }}
@@ -73,7 +121,7 @@ export default function Navigation() {
                 ) : (
                     // ── Main Stack ──
                     <>
-                        <Stack.Screen name="Home" component={HomeScreen} options={{ animation: 'fade' }} />
+                        <Stack.Screen name="Tabs" component={TabNavigator} options={{ animation: 'fade' }} />
                         <Stack.Screen name="NowPlaying" component={NowPlayingScreen} />
                         <Stack.Screen name="Queue" component={QueueScreen} />
                         <Stack.Screen name="Mood" component={MoodScreen} />
