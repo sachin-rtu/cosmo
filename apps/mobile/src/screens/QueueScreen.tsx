@@ -1,8 +1,10 @@
 import React, { useCallback, useRef } from 'react'
 import {
-    View, Text, StyleSheet, Image, TouchableOpacity,
+    View, Text, StyleSheet, TouchableOpacity,
     SafeAreaView, StatusBar, ScrollView,
 } from 'react-native'
+import { Image } from 'expo-image'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import ReanimatedSwipeable, { type SwipeableMethods } from 'react-native-gesture-handler/ReanimatedSwipeable'
@@ -17,7 +19,7 @@ type NavProp = NativeStackNavigationProp<RootStackParams>
 function RightAction() {
     return (
         <View style={styles.swipeDelete}>
-            <Text style={styles.swipeDeleteIcon}>✕</Text>
+            <Ionicons name="close" size={16} color="#fff" />
             <Text style={styles.swipeDeleteText}>Remove</Text>
         </View>
     )
@@ -96,7 +98,7 @@ export default function QueueScreen() {
                             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                             style={styles.dragHandleBtn}
                         >
-                            <Text style={styles.dragHandleIcon}>≡</Text>
+                            <Ionicons name="menu" size={24} color="#555" />
                         </TouchableOpacity>
                     </View>
                 </ReanimatedSwipeable>
@@ -115,7 +117,7 @@ export default function QueueScreen() {
                     style={styles.backBtn}
                     hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                 >
-                    <Text style={styles.backArrow}>←</Text>
+                    <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Queue</Text>
                 <Text style={styles.trackCount}>
@@ -145,7 +147,7 @@ export default function QueueScreen() {
                             </Text>
                         </View>
                         <View style={styles.nowPlayingBadge}>
-                            <Text style={styles.nowPlayingBadgeText}>♪</Text>
+                            <Ionicons name="musical-note" size={14} color="#000" />
                         </View>
                     </View>
                 </View>
@@ -157,7 +159,7 @@ export default function QueueScreen() {
 
                 {upcomingTracks.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Text style={styles.emptyIcon}>🎵</Text>
+                        <Ionicons name="musical-notes" size={40} color="#666" style={{ marginBottom: 8 }} />
                         <Text style={styles.emptyTitle}>Queue is empty</Text>
                         <Text style={styles.emptySubtitle}>
                             Add tracks from search results or play a playlist

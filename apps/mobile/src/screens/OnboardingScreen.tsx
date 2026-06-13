@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    SafeAreaView, StatusBar, Dimensions, FlatList,
-    Image, ScrollView
+    SafeAreaView, StatusBar, Dimensions, ScrollView
 } from 'react-native'
+import { Image } from 'expo-image'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useOnboardingStore } from '../store/onboardingStore'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
@@ -60,7 +61,7 @@ export default function OnboardingScreen() {
             <View style={styles.content}>
                 {step === 0 && (
                     <View style={styles.slide}>
-                        <Text style={styles.slideEmoji}>✨</Text>
+                        <Ionicons name="sparkles" size={80} color="#fff" style={{ marginBottom: 32 }} />
                         <Text style={styles.slideTitle}>Welcome to Cosmo</Text>
                         <Text style={styles.slideDesc}>
                             Your personal musical universe. Built for speed, quality, and limitless discovery.
@@ -70,7 +71,7 @@ export default function OnboardingScreen() {
 
                 {step === 1 && (
                     <View style={styles.slide}>
-                        <Text style={styles.slideEmoji}>🤖</Text>
+                        <Ionicons name="hardware-chip" size={80} color="#fff" style={{ marginBottom: 32 }} />
                         <Text style={styles.slideTitle}>Powered by AI</Text>
                         <Text style={styles.slideDesc}>
                             Cosmo uses Gemini to analyze your taste and InnerTube to instantly stream any track on the planet. Zero cost, zero ads.
@@ -110,7 +111,7 @@ export default function OnboardingScreen() {
                                         <View style={styles.artistOverlay} />
                                         {isSelected && (
                                             <View style={styles.checkBadge}>
-                                                <Text style={styles.checkIcon}>✓</Text>
+                                                <Ionicons name="checkmark" size={16} color="#000" style={{ fontWeight: '800' }} />
                                             </View>
                                         )}
                                         <Text style={styles.artistName} numberOfLines={1}>
