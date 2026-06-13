@@ -44,6 +44,23 @@ const app = Fastify({
     logger: true,
 });
 
+// Global Error Handler
+app.setErrorHandler((error, request, reply) => {
+    app.log.error(error);
+    Sentry.captureException(error);
+    
+    // Don't leak stack traces to client in production
+    reply.status(500).send({ 
+        error: 'Internal Server Error',
+        message: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    });
+});
+
+// Global Not Found Handler
+app.setNotFoundHandler((request, reply) => {
+    reply.status(404).send({ error: 'Not Found', status: 404 });
+});
+
 // Register Plugins 
 app.register(cachePlugin);
 app.register(queuePlugin);
@@ -65,6 +82,22 @@ app.register(playlistsRoutes, { prefix: '/playlists' });
 app.register(lyricsRoutes, { prefix: '/lyrics' });
 
 app.register(contextRoutes, { prefix: '/context' });
+
+// Graceful Shutdown Handlers
+const shutdown = async (signal: string) => {
+    app.log.info(`Received ${signal}. Shutting down gracefully...`);
+    try {
+        await app.close();
+        app.log.info('Closed out remaining connections.');
+        process.exit(0);
+    } catch (err) {
+        app.log.error(err);
+        process.exit(1);
+    }
+};
+
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));
 
 // Start server function 
 const start = async () => {
