@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react'
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity,
-    SafeAreaView, StatusBar, Image, ActivityIndicator, Alert
+    View, Text, StyleSheet, TouchableOpacity,
+    SafeAreaView, StatusBar, ActivityIndicator, Alert
 } from 'react-native'
+import { Image } from 'expo-image'
+import { FlashList } from '@shopify/flash-list'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import { usePlaylistStore, type Playlist } from '../store/playlistStore'
 import { usePlayerStore, type CosmoTrack } from '../store/playerStore'
@@ -91,8 +93,9 @@ export default function PlaylistDetailScreen() {
                 </TouchableOpacity>
             </View>
 
-            <FlatList
+            <FlashList
                 data={tracks}
+                estimatedItemSize={64}
                 keyExtractor={(item) => item.video_id}
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={

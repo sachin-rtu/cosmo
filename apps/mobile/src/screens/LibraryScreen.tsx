@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react'
 import {
-  View, Text, TouchableOpacity, FlatList, StyleSheet,
-  SafeAreaView, Image, StatusBar
+  View, Text, TouchableOpacity, StyleSheet,
+  SafeAreaView, StatusBar
 } from 'react-native'
+import { Image } from 'expo-image'
+import { FlashList } from '@shopify/flash-list'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useAuthStore } from '../store/authStore'
@@ -93,8 +95,10 @@ export default function LibraryScreen() {
             <Text style={styles.emptySubtitle}>No liked songs yet.</Text>
           </View>
         ) : (
-          <FlatList
+          // @ts-ignore - types are missing estimatedItemSize
+          <FlashList
             data={likedTracks}
+            estimatedItemSize={72}
             keyExtractor={(item) => item.video_id}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.likedList}

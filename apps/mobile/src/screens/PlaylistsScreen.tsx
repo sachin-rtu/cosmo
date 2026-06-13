@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react'
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity,
+    View, Text, StyleSheet, TouchableOpacity,
     SafeAreaView, StatusBar, Alert
 } from 'react-native'
+import { FlashList } from '@shopify/flash-list'
+import Ionicons from '@expo/vector-icons/Ionicons'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { usePlaylistStore } from '../store/playlistStore'
@@ -50,13 +52,13 @@ export default function PlaylistsScreen() {
                 <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
                 <View style={styles.header}>
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <Text style={styles.backArrow}>←</Text>
+                        <Ionicons name="arrow-back" size={24} color="#fff" />
                     </TouchableOpacity>
                     <Text style={styles.headerTitle}>Your Playlists</Text>
                     <View style={{ width: 40 }} />
                 </View>
                 <EmptyState
-                    icon="🔒"
+                    icon="lock-closed"
                     title="Log in required"
                     message="You must be logged in to create and save playlists."
                 />
@@ -70,16 +72,17 @@ export default function PlaylistsScreen() {
             
             <View style={styles.header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                    <Text style={styles.backArrow}>←</Text>
+                    <Ionicons name="arrow-back" size={24} color="#fff" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Your Playlists</Text>
                 <TouchableOpacity onPress={handleCreatePlaylist} style={styles.addBtn}>
-                    <Text style={styles.addIcon}>+</Text>
+                    <Ionicons name="add" size={32} color="#1DB954" />
                 </TouchableOpacity>
             </View>
 
-            <FlatList
+            <FlashList
                 data={playlists}
+                estimatedItemSize={80}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.listContent}
                 refreshing={loading}
@@ -87,7 +90,7 @@ export default function PlaylistsScreen() {
                 ListEmptyComponent={
                     !loading ? (
                         <EmptyState
-                            icon="🎵"
+                            icon="musical-notes"
                             title="No playlists yet"
                             message="Tap the button below to create your first playlist."
                             action={{ label: 'Create Playlist', onPress: handleCreatePlaylist }}
@@ -100,7 +103,7 @@ export default function PlaylistsScreen() {
                         onPress={() => navigation.navigate('PlaylistDetail', { playlist: item })}
                     >
                         <View style={styles.playlistIconBox}>
-                            <Text style={styles.playlistIcon}>🎵</Text>
+                            <Ionicons name="musical-notes" size={24} color="#1DB954" />
                         </View>
                         <View style={styles.playlistInfo}>
                             <Text style={styles.playlistName}>{item.name}</Text>
@@ -108,7 +111,7 @@ export default function PlaylistsScreen() {
                                 Created {new Date(item.created_at).toLocaleDateString()}
                             </Text>
                         </View>
-                        <Text style={styles.chevron}>›</Text>
+                        <Ionicons name="chevron-forward" size={20} color="#444" />
                     </TouchableOpacity>
                 )}
             />
