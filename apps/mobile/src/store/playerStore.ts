@@ -8,6 +8,7 @@ import api from '../services/api'
 import { recordPlay } from './insightsStore'
 import { resolveStreamClientSide } from '../services/innertubeService'
 import { stopCrossfade } from '../services/crossfadeService'
+import { getLocalFileUri } from '../services/downloadService'
 
 // Helper: resolve stream URL with client-side first, server fallback
 async function resolveStreamUrl(videoId: string): Promise<{ url: string; expiresAt: number }> {
@@ -173,8 +174,13 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         let streamUrl: string
         const prefetched = prefetchedUrls[track.videoId]
         const isStillValid = prefetched && prefetched.expiresAt > now + 3600
+        const localUri = getLocalFileUri(track.videoId)
 
-        if (isStillValid) {
+        if (localUri) {
+            // True Local Download (Offline)
+            streamUrl = localUri
+            console.log(`[Stream] Playing local file for ${track.videoId}`)
+        } else if (isStillValid) {
             streamUrl = prefetched.url
         } else {
             try {
@@ -269,7 +275,12 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
         let streamUrl = ''
 
         const already = prefetchedUrls[nextTrack.videoId]
-        if (already && already.expiresAt > now + 3600) {
+        const localUri = getLocalFileUri(nextTrack.videoId)
+
+        if (localUri) {
+            streamUrl = localUri
+            console.log(`[Stream] Prefetch skipped - playing local file for ${nextTrack.videoId}`)
+        } else if (already && already.expiresAt > now + 3600) {
             streamUrl = already.url
         } else {
             try {

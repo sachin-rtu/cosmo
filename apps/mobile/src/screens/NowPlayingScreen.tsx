@@ -17,6 +17,8 @@ import { usePlayerStore } from '../store/playerStore'
 import { useLikesStore } from '../store/likesStore'
 import { usePlaylistStore } from '../store/playlistStore'
 import { useAuthStore } from '../store/authStore'
+import { useDownloadStore } from '../store/downloadStore'
+import { downloadTrack, removeLocalDownload } from '../services/downloadService'
 import api from '../services/api'
 import type { RootStackParams } from '../navigation'
 import Feather from '@expo/vector-icons/Feather'
@@ -55,6 +57,10 @@ export default function NowPlayingScreen() {
     // Hydrate likes on mount
     useEffect(() => { fetchLikes() }, [])
 
+    const activeDownloads = useDownloadStore(s => s.activeDownloads)
+    const isDownloaded = useDownloadStore(s => s.isDownloaded)
+
+    // Context card
     const [contextCard, setContextCard] = useState<ContextCard | null>(null)
     const [contextLoading, setContextLoading] = useState(false)
 
@@ -381,6 +387,29 @@ export default function NowPlayingScreen() {
                     </Text>
                 </View>
                 <View style={styles.actionBtns}>
+                    <TouchableOpacity
+                        style={styles.heartBtn}
+                        onPress={() => {
+                            if (!currentTrack) return
+                            if (isDownloaded(currentTrack.videoId)) {
+                                Alert.alert('Remove Download', 'Are you sure you want to remove this offline track?', [
+                                    { text: 'Cancel', style: 'cancel' },
+                                    { text: 'Remove', style: 'destructive', onPress: () => removeLocalDownload(currentTrack.videoId) }
+                                ])
+                            } else if (activeDownloads[currentTrack.videoId]?.status !== 'downloading') {
+                                downloadTrack(currentTrack)
+                            }
+                        }}
+                        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                    >
+                        {activeDownloads[currentTrack?.videoId ?? '']?.status === 'downloading' ? (
+                            <ActivityIndicator size="small" color="#1DB954" />
+                        ) : isDownloaded(currentTrack?.videoId ?? '') ? (
+                            <Ionicons name="cloud-done" size={24} color="#1DB954" />
+                        ) : (
+                            <Ionicons name="cloud-download-outline" size={24} color="#fff" />
+                        )}
+                    </TouchableOpacity>
                     <TouchableOpacity
                         style={styles.heartBtn}
                         onPress={handleShare}
