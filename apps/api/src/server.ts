@@ -33,13 +33,18 @@ import queuePlugin from './plugins/queue'
 import contextRoutes from './routes/context'
 import { startContextWorker } from './workers/contextWorker'
 
-// Intialize Sentry 
-Sentry.init({
-    dsn: process.env.SENTRY_DSN,
-    integrations: [nodeProfilingIntegration()],
-    tracesSampleRate: 1.0,
-    profilesSampleRate: 1.0,
-});
+// Intialize Sentry (skipped when SENTRY_DSN is unset)
+const isProd = process.env.NODE_ENV === 'production';
+const defaultSampleRate = isProd ? 0.1 : 1.0;
+
+if (process.env.SENTRY_DSN) {
+    Sentry.init({
+        dsn: process.env.SENTRY_DSN,
+        integrations: [nodeProfilingIntegration()],
+        tracesSampleRate: parseFloat(process.env.SENTRY_TRACES_SAMPLE_RATE || '') || defaultSampleRate,
+        profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '') || defaultSampleRate,
+    });
+}
 
 const app = Fastify({
     logger: process.env.NODE_ENV !== 'production'
