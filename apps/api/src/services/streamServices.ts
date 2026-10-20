@@ -1,7 +1,6 @@
 import { logger } from '../utils/logger'
 import { Innertube, Platform } from 'youtubei.js'
-import youtubedl, { create as createYtdl } from 'youtube-dl-exec'
-import { execSync } from 'child_process'
+import { execSync, execFileSync } from 'child_process'
 import play from 'play-dl'
 import path from 'path'
 import fs from 'fs'
@@ -46,21 +45,8 @@ try {
         customYtDlpPath = execSync('which yt-dlp', { encoding: 'utf-8' }).trim()
     }
 } catch {
-    // yt-dlp not available
+    // yt-dlp not available — strategy will skip silently
 }
-
-const ytdlOptions = {
-    dumpSingleJson: true,
-    noCheckCertificates: true,
-    noWarnings: true,
-    preferFreeFormats: true,
-    'extractor-args': 'youtube:player_client=android,ios',
-    addHeader: [
-        'referer:youtube.com',
-        'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'
-    ]
-} as const;
-const ytdlOpts = { ...ytdlOptions, addHeader: [...ytdlOptions.addHeader] } as any
 
 function parseYtDlpResult(info: any, videoId: string): streamResult {
     if (info.is_live) {
@@ -86,14 +72,27 @@ function parseYtDlpResult(info: any, videoId: string): streamResult {
     }
 }
 
-// Strategy 1: use yt-dlp via youtube-dl-exec
+// Strategy 1: use yt-dlp binary directly (skips silently when no binary exists)
 async function getStreamUrlWithYtDlp(videoId: string): Promise<streamResult> {
+    if (!customYtDlpPath) {
+        logger.info('yt-dlp binary not found, skipping strategy')
+        throw new Error('yt-dlp not available')
+    }
+
     const url = `https://www.youtube.com/watch?v=${videoId}`
 
-    // Use standalone binary if available, otherwise try the bundled one
-    const ytdl = customYtDlpPath ? createYtdl(customYtDlpPath) : youtubedl
+    const output = execFileSync(customYtDlpPath, [
+        '--dump-single-json',
+        '--no-check-certificates',
+        '--no-warnings',
+        '--prefer-free-formats',
+        '--extractor-args', 'youtube:player_client=android,ios',
+        '--add-header', 'referer:youtube.com',
+        '--add-header', 'user-agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36',
+        url,
+    ], { encoding: 'utf-8', timeout: 30000 })
 
-    const info = await ytdl(url, ytdlOpts) as any
+    const info = JSON.parse(output)
     return parseYtDlpResult(info, videoId)
 }
 

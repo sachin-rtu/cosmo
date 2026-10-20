@@ -26,7 +26,6 @@
     "pino": "^9.2.0",
     "play-dl": "^1.9.7",
     "tsx": "^4.15.2",
-    "youtube-dl-exec": "^3.1.7",
     "youtubei.js": "^17.0.1"
   },
   "devDependencies": {
