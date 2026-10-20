@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
-    SafeAreaView, StatusBar, ActivityIndicator, Alert,
+    SafeAreaView, StatusBar, ActivityIndicator,
     KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { supabase } from '../services/supabase'
@@ -44,7 +45,11 @@ export default function LoginScreen() {
 
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password')
+            Toast.show({
+                type: 'error',
+                text1: 'Missing fields',
+                text2: 'Please enter email and password',
+            })
             return
         }
 
@@ -56,7 +61,11 @@ export default function LoginScreen() {
         setLoading(false)
 
         if (error) {
-            Alert.alert('Login Failed', error.message)
+            Toast.show({
+                type: 'error',
+                text1: 'Login failed',
+                text2: error.message,
+            })
         }
     }
 
@@ -83,7 +92,11 @@ export default function LoginScreen() {
                 }
             }
         } catch (err: any) {
-            Alert.alert('Google Login Error', err.message)
+            Toast.show({
+                type: 'error',
+                text1: 'Google login error',
+                text2: err.message,
+            })
         }
     }
 

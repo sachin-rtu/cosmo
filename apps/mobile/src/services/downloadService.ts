@@ -3,7 +3,7 @@ import { CosmoTrack } from '../store/playerStore'
 import { useDownloadStore } from '../store/downloadStore'
 import { resolveStreamClientSide } from './innertubeService'
 import api from './api'
-import { Alert } from 'react-native'
+import Toast from 'react-native-toast-message'
 
 // @ts-expect-error - documentDirectory is a valid property but types are missing in this expo-file-system version
 const DOWNLOADS_DIR = `${FileSystem.documentDirectory}downloads/`
@@ -63,7 +63,11 @@ export async function downloadTrack(track: CosmoTrack) {
     } catch (error: any) {
         console.error(`Download error for ${track.videoId}:`, error)
         setDownloadStatus(track.videoId, 'error')
-        Alert.alert('Download Failed', error.message)
+        Toast.show({
+            type: 'error',
+            text1: 'Download failed',
+            text2: `Could not download ${track.title}. Please try again.`,
+        })
     }
 }
 

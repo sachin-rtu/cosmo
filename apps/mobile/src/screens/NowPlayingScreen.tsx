@@ -4,6 +4,7 @@ import {
     SafeAreaView, StatusBar, ActivityIndicator,
     Dimensions, Platform, ScrollView, Modal, Pressable, FlatList, Alert, Share
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { Image } from 'expo-image'
 import { BlurView } from 'expo-blur'
 import { FlashList } from '@shopify/flash-list'
@@ -423,7 +424,11 @@ export default function NowPlayingScreen() {
                         style={styles.heartBtn}
                         onPress={() => {
                             if (!session) {
-                                Alert.alert('Account Required', 'Please log in to add to playlists.')
+                                Toast.show({
+                                    type: 'info',
+                                    text1: 'Account required',
+                                    text2: 'Please log in to add to playlists.',
+                                })
                                 return
                             }
                             setPlaylistModalVisible(true)

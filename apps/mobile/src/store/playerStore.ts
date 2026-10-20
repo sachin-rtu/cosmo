@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import TrackPlayer, { RepeatMode } from '@rntp/player'
 import { createMMKV } from 'react-native-mmkv'
-import { Alert } from 'react-native'
+import Toast from 'react-native-toast-message'
 
 const playerStorage = createMMKV({ id: 'cosmo-player-settings' })
 import api from '../services/api'
@@ -208,7 +208,11 @@ export const usePlayerStore = create<PlayerStore>((set, get) => ({
                 }))
             } catch (error: any) {
                 console.error(`Failed to resolve stream for ${track.videoId}:`, error.message)
-                Alert.alert("Playback Error", `Could not play ${track.title}.\n\nError: ${error.message}`)
+                Toast.show({
+                    type: 'error',
+                    text1: 'Playback failed',
+                    text2: `Could not play ${track.title}. Please try again.`,
+                })
                 return // skip if we can't get a URL anywhere
             }
         }

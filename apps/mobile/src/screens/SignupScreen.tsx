@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
-    SafeAreaView, StatusBar, ActivityIndicator, Alert,
+    SafeAreaView, StatusBar, ActivityIndicator,
     KeyboardAvoidingView, Platform, ScrollView
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { useNavigation } from '@react-navigation/native'
 import { supabase } from '../services/supabase'
 
@@ -16,7 +17,11 @@ export default function SignupScreen() {
 
     const handleSignup = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please enter email and password')
+            Toast.show({
+                type: 'error',
+                text1: 'Missing fields',
+                text2: 'Please enter email and password',
+            })
             return
         }
 
@@ -28,9 +33,17 @@ export default function SignupScreen() {
         setLoading(false)
 
         if (error) {
-            Alert.alert('Signup Failed', error.message)
+            Toast.show({
+                type: 'error',
+                text1: 'Signup failed',
+                text2: error.message,
+            })
         } else {
-            Alert.alert('Success', 'Please check your email for the confirmation link.')
+            Toast.show({
+                type: 'success',
+                text1: 'Check your email',
+                text2: 'Confirmation link sent to your email.',
+            })
             navigation.goBack()
         }
     }

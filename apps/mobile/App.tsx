@@ -5,10 +5,12 @@ import TrackPlayer, { PlayerCommand } from '@rntp/player'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { ErrorBoundary } from 'react-error-boundary'
 import * as ExpoSplashScreen from 'expo-splash-screen'
+import Toast from 'react-native-toast-message'
 import { PlaybackService } from './src/services/trackPlayerService'
 import SplashScreen from './src/screens/SplashScreen'
 import GlobalErrorFallback from './src/components/GlobalErrorFallback'
 import Navigation from './src/navigation'
+import { warmUpApi } from './src/services/api'
 
 ExpoSplashScreen.preventAutoHideAsync()
 const queryClient = new QueryClient()
@@ -19,6 +21,9 @@ export default function App() {
   const [showSplash, setShowSplash] = useState(true)
 
   useEffect(() => {
+    // Wake Render free-tier API (fire-and-forget, never blocks)
+    warmUpApi()
+
     async function setup() {
       try {
         await TrackPlayer.setupPlayer()
@@ -59,6 +64,7 @@ export default function App() {
           </ErrorBoundary>
         )}
       </QueryClientProvider>
+      <Toast />
     </GestureHandlerRootView>
   )
 }

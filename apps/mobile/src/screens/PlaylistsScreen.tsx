@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, TouchableOpacity,
     SafeAreaView, StatusBar, Alert
 } from 'react-native'
+import Toast from 'react-native-toast-message'
 import { FlashList } from '@shopify/flash-list'
 import Ionicons from '@expo/vector-icons/Ionicons'
 import { useNavigation } from '@react-navigation/native'
@@ -24,7 +25,11 @@ export default function PlaylistsScreen() {
 
     const handleCreatePlaylist = () => {
         if (isGuest || !session) {
-            Alert.alert('Account Required', 'Please log in to create custom playlists.')
+            Toast.show({
+                type: 'info',
+                text1: 'Account required',
+                text2: 'Please log in to create custom playlists.',
+            })
             return
         }
 
