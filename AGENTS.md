@@ -31,6 +31,7 @@ Cosmo/
 #### Folder structure
 ```
 src/
+  config/        ← Runtime configuration (env.ts)
   plugins/       ← Fastify plugins (cache.ts, queue.ts, supabase.ts)
   routes/        ← HTTP route handlers
   services/      ← Business logic (no HTTP knowledge here)
@@ -47,22 +48,25 @@ src/
 
 #### Environment variables (apps/api/.env)
 ```
+NODE_ENV
 SUPABASE_URL
 SUPABASE_ANON_KEY
 SUPABASE_SERVICE_ROLE_KEY
 UPSTASH_REDIS_REST_URL
 UPSTASH_REDIS_REST_TOKEN
-REDIS_WORKER_URL          ← Railway Redis for BullMQ (NOT Upstash)
+REDIS_WORKER_URL          ← Upstash Redis TCP URL (rediss://) for BullMQ (NOT the REST URL)
 GEMINI_API_KEY
-SENTRY_DSN
+SENTRY_DSN                ← optional; Sentry init is skipped when unset
+SENTRY_TRACES_SAMPLE_RATE ← optional; defaults 0.1 prod, 1.0 dev
+SENTRY_PROFILES_SAMPLE_RATE ← optional; defaults 0.1 prod, 1.0 dev
 ```
 
 #### Critical architectural rules
 - **NEVER** store YouTube stream URLs (`.googlevideo.com`, `.m3u8`) in Supabase
-- **NEVER** call InnerTube from the mobile app — always via Fastify backend
-- **ALWAYS** use `REDIS_WORKER_URL` for BullMQ (not `RAILWAY_REDIS_URL`)
-- **ALWAYS** use `UPSTASH_REDIS_REST_URL` for caching (not BullMQ)
-- Cache keys follow pattern: `stream:{videoId}`, `context:{videoId}`, `lyrics:{title}:{artist}`
+- The mobile app resolves stream URLs **on-device** via InnerTube first (residential IPs avoid bot checks). `GET /stream/:videoId` is the **server fallback**. Do not remove or refactor the on-device path.
+- **ALWAYS** use `REDIS_WORKER_URL` (Upstash Redis TCP, `rediss://`) for BullMQ
+- **ALWAYS** use `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` (HTTP) for caching via `@upstash/redis` — never for BullMQ
+- Cache keys follow pattern: `stream:{quality}:{videoId}`, `context:{videoId}`, `lyrics:{title}:{artist}`
 - Stream URL TTL: 14400 seconds (4 hours)
 - Context card TTL: 604800 seconds (7 days)
 - Lyrics TTL: 604800 seconds (7 days)
@@ -105,20 +109,21 @@ src/
 - Always add haptic feedback to interactive elements
 - Always use `Reanimated` for animations, never `Animated` from react-native
 - `EXPO_PUBLIC_` prefix is required on all env vars exposed to the app
-- API URL must point to Railway deployment URL, never localhost in release builds
+- API URL must point to Render deployment URL, never localhost in release builds
 
 #### Environment variables (apps/mobile/.env)
 ```
-EXPO_PUBLIC_API_URL        ← Railway URL, no trailing slash
+EXPO_PUBLIC_API_URL        ← Render URL, no trailing slash
 EXPO_PUBLIC_SUPABASE_URL
 EXPO_PUBLIC_SUPABASE_ANON_KEY
 ```
 
-#### Critical stream resolution flow (JIT architecture)
+#### Critical stream resolution flow (on-device first)
 ```
 User taps play
   → check in-memory prefetchedUrls (Zustand) first
-  → if miss → GET /stream/:videoId from Fastify
+  → if miss → resolve on-device via InnerTube (residential IP, most reliable)
+  → if on-device fails → GET /stream/:videoId from Fastify (server fallback)
   → Fastify checks Upstash Redis
   → if miss → fetch from InnerTube via youtubei.js
   → cache in Redis 4 hours
@@ -138,12 +143,12 @@ User taps play
 | API | Fastify + TypeScript |
 | Database | Supabase (PostgreSQL + RLS) |
 | Auth | Supabase Auth (JWT) |
-| Cache | Upstash Redis (HTTP) |
-| Queue | BullMQ on Railway Redis (TCP) |
+| Cache | Upstash Redis (HTTP REST client) |
+| Queue | BullMQ on Upstash Redis (TCP, `rediss://`) |
 | AI | Gemini 2.0 Flash |
-| Audio source | YouTube InnerTube via youtubei.js |
+| Audio source | YouTube InnerTube via youtubei.js (server) / direct InnerTube API (mobile) |
 | Monitoring | Sentry |
-| Deployment | Railway (API) |
+| Deployment | Render free tier (API) — service sleeps after ~15 min idle |
 
 ### Database schema (Supabase)
 ```
@@ -166,7 +171,7 @@ notification   → push notifications
 ### API routes
 ```
 GET  /health
-GET  /stream/:videoId          ← JIT stream fetch
+GET  /stream/:videoId          ← server fallback stream fetch
 GET  /stream/search?q=         ← InnerTube search
 DELETE /stream/:videoId/cache  ← invalidate cached URL
 POST /context/:videoId         ← trigger context card job
@@ -231,7 +236,7 @@ cd android
 - Add new routes to existing route files if they belong to same domain
 - Create new service files for new external API integrations
 - Register all new Fastify plugins and routes in `server.ts`
-- Add new env vars to both `.env.example` and Railway variables
+- Add new env vars to both `.env.example` and Render dashboard
 
 ### When fixing bugs
 - Identify the root cause before changing code
@@ -249,9 +254,8 @@ cd android
 - Never commit `.env` files
 - Never hardcode API keys, tokens, or secrets
 - Never store YouTube stream URLs in any database
-- Never call InnerTube directly from the mobile app
+- Never remove or refactor the mobile on-device InnerTube resolution path
 - Never use `FlatList`, `Image` from react-native, or emojis as icons in mobile
-- Never use Upstash Redis for BullMQ connections
+- Never use Upstash Redis REST URL for BullMQ connections — use the TCP `rediss://` URL
 - Never enable `newArchEnabled=true` until RNTP officially supports it
 - Never use `console.log` in the API — use `fastify.log`
-
