@@ -41,7 +41,9 @@ Sentry.init({
 });
 
 const app = Fastify({
-    logger: true,
+    logger: process.env.NODE_ENV !== 'production'
+        ? { transport: { target: 'pino-pretty' } }
+        : true,
 });
 
 // Global Error Handler
