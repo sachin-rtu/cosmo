@@ -3,7 +3,8 @@ import { Worker } from 'bullmq'
 import { Redis } from '@upstash/redis'
 import { generateContextCard } from '../services/geminiService'
 import { JOB_NAMES, type ContextJobData } from '../plugins/queue'
-// Later move to separate railway service
+import { getBullConnection } from '../config/redis'
+// Later move to separate service
 
 const upstash = new Redis({
     url: process.env.UPSTASH_REDIS_REST_URL!,
@@ -11,9 +12,7 @@ const upstash = new Redis({
 })
 
 export function startContextWorker() {
-    const redisUrl = new URL(process.env.REDIS_WORKER_URL!)
-
-    logger.info(`[contextWorker] Connecting to Redis at ${redisUrl.hostname}:${redisUrl.port}`)
+    logger.info('[contextWorker] Starting worker')
 
     const worker = new Worker(
         'cosmo-jobs',
@@ -36,14 +35,10 @@ export function startContextWorker() {
             return { success: true, videoId }
         },
         {
-            connection: {
-                host: redisUrl.hostname,
-                port: parseInt(redisUrl.port),
-                password: redisUrl.password,
-                username: redisUrl.username || undefined,
-                maxRetriesPerRequest: null,
-            },
+            connection: getBullConnection(),
             concurrency: 5,
+            drainDelay: 30,
+            stalledInterval: 120000,
         }
     )
 
@@ -63,6 +58,7 @@ export function startContextWorker() {
         logger.info(`[contextWorker] Job ${job?.id} failed:`, err.message)
     })
 
+    // Never crash on Redis errors
     worker.on('error', (err) => {
         logger.error(`[contextWorker] Worker error:`, err.message)
     })

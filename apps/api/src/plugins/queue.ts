@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin'
 import { Queue } from 'bullmq'
 import type { FastifyInstance } from 'fastify'
+import { getBullConnection } from '../config/redis'
 
 export interface ContextJobData {
     videoId: string,
@@ -22,23 +23,10 @@ declare module 'fastify' {
 }
 
 export default fp(async (fastify: FastifyInstance) => {
-    const redisUrl = new URL(process.env.REDIS_WORKER_URL!)
-
     const queue = new Queue('cosmo-jobs', {
         connection: {
-            host: redisUrl.hostname,
-            port: parseInt(redisUrl.port),
-            password: redisUrl.password,
-            username: redisUrl.username || undefined,
-            maxRetriesPerRequest: null,
+            ...getBullConnection(),
             lazyConnect: true,
-            retryStrategy: (times: number) => {
-                if (times > 5) {
-                    fastify.log.warn(`BullMQ: giving up reconnect after ${times} attempts`)
-                    return null // stop retrying
-                }
-                return Math.min(times * 1000, 10000)
-            },
         },
         defaultJobOptions: {
             attempts: 3,
@@ -51,7 +39,12 @@ export default fp(async (fastify: FastifyInstance) => {
         },
     })
 
-    // Suppress noisy ioredis connection errors
+    // Log once when the connection is live
+    queue.on('ioredis:close', () => {
+        fastify.log.warn('BullMQ queue: Redis connection closed')
+    })
+
+    // Suppress noisy ioredis connection errors — never crash
     queue.on('error', (err) => {
         fastify.log.warn({ err: err.message }, 'BullMQ queue error (non-fatal)')
     })
