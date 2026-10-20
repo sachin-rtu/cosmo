@@ -21,6 +21,7 @@ import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
 import authRoutes from './routes/auth';
 import cachePlugin from './plugins/cache';
 import { streamRoutes } from './routes/stream';
@@ -50,6 +51,7 @@ const app = Fastify({
     logger: process.env.NODE_ENV !== 'production'
         ? { transport: { target: 'pino-pretty' } }
         : true,
+    trustProxy: true,
 });
 
 // Global Error Handler
@@ -73,14 +75,21 @@ app.setNotFoundHandler((request, reply) => {
 app.register(cachePlugin);
 app.register(queuePlugin);
 app.register(cors, { origin: '*' });
+app.register(rateLimit, {
+    max: 100,
+    timeWindow: '1 minute',
+    allowList: (req) => req.url === '/health',
+});
 
 // Base Routes 
 app.get('/health', async (request, reply) => {
     return { status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() };
 });
 
-// Register Auth Routes
-app.register(authRoutes);
+// Register Auth Routes (tighter rate limit to prevent brute-force)
+app.register(authRoutes, {
+    config: { rateLimit: { max: 10, timeWindow: '1 minute' } },
+});
 
 app.register(streamRoutes, { prefix: '/stream' });
 app.register(trendingRoutes, { prefix: '/trending' });

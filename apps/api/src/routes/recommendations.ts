@@ -15,14 +15,19 @@ export async function recommendationRoutes(fastify: FastifyInstance) {
 
         const cacheKey = buildRecsCacheKey(artists, hour)
 
-        const tracks = await getOrSet(
-            fastify,
-            cacheKey,
-            () => getRecommendations(artists, hour),
-            { ttlSeconds: 14400 } // 4 hours
-        )
+        try {
+            const tracks = await getOrSet(
+                fastify,
+                cacheKey,
+                () => getRecommendations(artists, hour),
+                { ttlSeconds: 14400 } // 4 hours
+            )
 
-        return reply.send(tracks)
+            return reply.send(tracks)
+        } catch (err) {
+            fastify.log.error({ err }, 'recommendations: fetch failed')
+            return reply.status(502).send({ error: 'Recommendations temporarily unavailable' })
+        }
     })
 
     fastify.post('/playlist', async (request, reply) => {
@@ -31,8 +36,13 @@ export async function recommendationRoutes(fastify: FastifyInstance) {
             return reply.status(400).send({ error: 'Valid mood string is required' })
         }
 
-        const tracks = await getMoodPlaylist(mood)
-        return reply.send(tracks)
+        try {
+            const tracks = await getMoodPlaylist(mood)
+            return reply.send(tracks)
+        } catch (err) {
+            fastify.log.error({ err }, 'playlist: mood generation failed')
+            return reply.status(502).send({ error: 'Playlist generation temporarily unavailable' })
+        }
     })
 
     fastify.post('/voice-search', async (request, reply) => {
@@ -44,9 +54,9 @@ export async function recommendationRoutes(fastify: FastifyInstance) {
         try {
             const result = await getVoiceSearchResults(audioBase64, mimeType)
             return reply.send(result)
-        } catch (error: any) {
-            fastify.log.error(error)
-            return reply.status(500).send({ error: 'Failed to process voice search' })
+        } catch (err) {
+            fastify.log.error({ err }, 'voice-search: processing failed')
+            return reply.status(502).send({ error: 'Voice search temporarily unavailable' })
         }
     })
 }

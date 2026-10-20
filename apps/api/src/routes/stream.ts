@@ -35,21 +35,26 @@ export async function streamRoutes(fastify: FastifyInstance) {
 
         const cacheKey = streamCacheKey(videoId, streamQuality)
 
-        const result = await getOrSet(
-            fastify,
-            cacheKey,
-            () => getStreamUrl(videoId, streamQuality),
-            {
-                ttlSeconds: 14400,
-                forceRefresh: shouldForceRefresh,
+        try {
+            const result = await getOrSet(
+                fastify,
+                cacheKey,
+                () => getStreamUrl(videoId, streamQuality),
+                {
+                    ttlSeconds: 14400,
+                    forceRefresh: shouldForceRefresh,
+                }
+            )
+
+            if (shouldForceRefresh) {
+                fastify.log.info({ videoId }, 'stream:force-refreshed')
             }
-        )
 
-        if (shouldForceRefresh) {
-            fastify.log.info({ videoId }, 'stream:force-refreshed')
+            return reply.send(result)
+        } catch (err) {
+            fastify.log.error({ err, videoId }, 'stream: resolution failed')
+            return reply.status(502).send({ error: 'Stream temporarily unavailable' })
         }
-
-        return reply.send(result)
     })
 
     fastify.delete('/:videoId/cache', async (request, reply) => {
